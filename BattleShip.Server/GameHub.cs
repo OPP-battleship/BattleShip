@@ -36,16 +36,24 @@ public class GameHub : Hub
     {
         if (!SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) || session is null) return;
 
-        bool success = session.TryFireShot(Context.ConnectionId, request.X, request.Y, out bool isHit);
+        var targets = request.Targets ?? Array.Empty<ShotTarget>();
+        bool success = session.TryFireShotPattern(Context.ConnectionId, targets, out var outcomes);
         if (!success) return; // Invalid move
 
         var opponentId = session.OpponentOf(Context.ConnectionId);
+        var lastIndex = outcomes.Count - 1;
 
-        await Clients.Client(Context.ConnectionId)
-            .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, request.X, request.Y, isHit, IsYourTurnNext: false));
+        for (int i = 0; i < outcomes.Count; i++)
+        {
+            var outcome = outcomes[i];
+            bool isYourTurnNext = i == lastIndex;
 
-        await Clients.Client(opponentId)
-            .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, request.X, request.Y, isHit, IsYourTurnNext: true));
+            await Clients.Client(Context.ConnectionId)
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, IsYourTurnNext: false));
+
+            await Clients.Client(opponentId)
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, IsYourTurnNext: isYourTurnNext));
+        }
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

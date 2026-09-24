@@ -1,6 +1,6 @@
 ﻿namespace BattleShip.Shared;
 
-public record FireShotRequest(int X, int Y);
+public record FireShotRequest(ShotTarget[] Targets);
 
 public record MatchFoundMessage(string SessionId, bool YouGoFirst);
 

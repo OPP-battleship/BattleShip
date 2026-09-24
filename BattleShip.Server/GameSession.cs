@@ -28,22 +28,45 @@ public class GameSession
     private GridModel GridOf(string connectionId) =>
         connectionId == PlayerAConnectionId ? GridA : GridB;
     
-    public bool TryFireShot(string shooterConnectionId, int x, int y, out bool isHit)
+    internal bool TryFireShotPattern(string shooterConnectionId, IReadOnlyList<ShotTarget> targets, out IReadOnlyList<ShotOutcome> outcomes)
     {
-        isHit = false;
+        outcomes = [];
+        var results = new List<ShotOutcome>();
 
         lock (_lock)
         {
             if (shooterConnectionId != CurrentTurnConnectionId) return false;
-            if (x < 0 || x >= GridModel.Size || y < 0 || y >= GridModel.Size) return false;
+            if (targets.Count == 0) return false;
 
             var defenderId = OpponentOf(shooterConnectionId);
             var defenderGrid = GridOf(defenderId);
-            isHit = defenderGrid.GetCell(x, y) == CellState.Ship;
 
-            if (!defenderGrid.TryMarkFired(x, y)) return false;
+            var seenTargets = new HashSet<ShotTarget>();
+            foreach (var target in targets)
+            {
+                if (!seenTargets.Add(target))
+                {
+                    continue;
+                }
+
+                if (!GridModel.IsInsideBounds(target.X, target.Y))
+                {
+                    continue;
+                }
+
+                bool isHit = defenderGrid.GetCell(target.X, target.Y) == CellState.Ship;
+                if (!defenderGrid.TryMarkFired(target.X, target.Y))
+                {
+                    continue;
+                }
+
+                results.Add(new ShotOutcome(target.X, target.Y, isHit));
+            }
+
+            if (results.Count == 0) return false;
 
             CurrentTurnConnectionId = defenderId;
+            outcomes = results;
             return true;
         }
     }
