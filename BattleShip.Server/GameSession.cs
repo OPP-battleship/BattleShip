@@ -40,6 +40,7 @@ public class GameSession
 
             var defenderId = OpponentOf(shooterConnectionId);
             var defenderGrid = GridOf(defenderId);
+            isHit = defenderGrid.GetCell(x, y) == CellState.Ship;
 
             var seenTargets = new HashSet<ShotTarget>();
             foreach (var target in targets)
