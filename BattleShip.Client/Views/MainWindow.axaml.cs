@@ -15,6 +15,10 @@ public partial class MainWindow : Window
     private readonly BoardFactory _BoardFactory = new();
     private readonly Button[,] _yourButtons = new Button[GridModel.Size, GridModel.Size];
     private readonly Button[,] _enemyButtons = new Button[GridModel.Size, GridModel.Size];
+    private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
+    private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
+    private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
+    private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
 
     private string? _myConnectionId;
     private bool _isMyTurn;
@@ -115,7 +119,18 @@ public partial class MainWindow : Window
         if (!_isMyTurn) return;
         if (clicked.Content is not null) return; // already fired on this cell
 
-        await _connection.FireShotAsync(x, y);
+        var shotStrategy = GetSelectedShotStrategy();
+        await _connection.FireShotAsync(shotStrategy.GetTargets(x, y));
+    }
+
+    private IShotStrategy GetSelectedShotStrategy()
+    {
+        return ShotModeComboBox.SelectedIndex switch
+        {
+            1 => LineOrientationComboBox.SelectedIndex == 1 ? _verticalLineShotStrategy : _horizontalLineShotStrategy,
+            2 => _spreadShotStrategy,
+            _ => _singleShotStrategy
+        };
     }
     
     private void UpdateTurnText()

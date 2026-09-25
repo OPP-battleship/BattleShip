@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR.Client;
 using BattleShip.Shared;
@@ -33,9 +35,9 @@ public class ConnectionService
         return _connection.InvokeAsync("FindMatch");
     }
 
-    public Task FireShotAsync(int x, int y)
+    public Task FireShotAsync(IEnumerable<ShotTarget> targets)
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
-        return _connection.InvokeAsync("FireShot", new FireShotRequest(x, y));
+        return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
     }
 }

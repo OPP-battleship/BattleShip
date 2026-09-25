@@ -27,6 +27,24 @@
                         <StackPanel Grid.Column="1" Spacing="8">
                                 <TextBlock Text="Enemy Board" FontSize="18" HorizontalAlignment="Center"/>
                                 <UniformGrid Name="EnemyGrid" Rows="10" Columns="10" Width="400" Height="400"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                                        <StackPanel Spacing="4">
+                                                <TextBlock Text="Shot Type" HorizontalAlignment="Center"/>
+                                                <ComboBox x:Name="ShotModeComboBox" SelectedIndex="0" Width="140">
+                                                        <ComboBoxItem Content="Single Shot"/>
+                                                        <ComboBoxItem Content="Line Shot"/>
+                                                        <ComboBoxItem Content="Spread Shot"/>
+                                                </ComboBox>
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="4">
+                                                <TextBlock Text="Line Direction" HorizontalAlignment="Center"/>
+                                                <ComboBox x:Name="LineOrientationComboBox" SelectedIndex="0" Width="140">
+                                                        <ComboBoxItem Content="Horizontal"/>
+                                                        <ComboBoxItem Content="Vertical"/>
+                                                </ComboBox>
+                                        </StackPanel>
+                                </StackPanel>
                                 <TextBlock Name="TurnText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
                         </StackPanel>
                 </Grid>

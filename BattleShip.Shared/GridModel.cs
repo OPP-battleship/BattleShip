@@ -20,6 +20,8 @@ public class GridModel
         }
     }
     
+    public static bool IsInsideBounds(int x, int y) => x >= 0 && x < Size && y >= 0 && y < Size;
+
     public CellState GetCell(int x, int y) => _cells[x, y];
     
     public bool TryMarkFired(int x, int y)
