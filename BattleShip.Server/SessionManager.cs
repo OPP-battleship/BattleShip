@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BattleShip.Shared;
 
 namespace BattleShip.Server;
 
@@ -61,7 +62,10 @@ public sealed class SessionManager
                 return null;
             }
 
-            var session = new GameSession(opponentId, connectionId);
+            ILevelFactory levelFactory = Random.Shared.Next(1, 3) == 1
+                ? new Level1Factory()
+                : new Level2Factory();
+            var session = new GameSession(opponentId, connectionId, levelFactory);
             SessionsByConnection[opponentId] = session;
             SessionsByConnection[connectionId] = session;
             return session;
