@@ -22,7 +22,7 @@ public partial class MainWindow : Window
 
     private string? _myConnectionId;
     private bool _isMyTurn;
-    
+
     public MainWindow()
     {
         InitializeComponent();
@@ -57,7 +57,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             _isMyTurn = msg.YouGoFirst;
-            BuildGrids();
+            BuildGrids(msg.Board);
             MenuPanel.IsVisible = false;
             GamePanel.IsVisible = true;
             UpdateTurnText();
@@ -72,14 +72,18 @@ public partial class MainWindow : Window
             var grid = iShotThis ? _enemyButtons : _yourButtons;
 
             var button = grid[msg.X, msg.Y];
-            button.Content = "X";
-            button.Background = msg.IsHit ? Brushes.Red : Brushes.SteelBlue;
+            button.Content = msg.IsHit || msg.IsObstacle ? "X" : "*";
+            button.Background = msg.IsObstacle
+                ? Brushes.Gray
+                : msg.IsHit
+                    ? Brushes.Red
+                    : Brushes.Gold;
 
             _isMyTurn = msg.IsYourTurnNext;
             UpdateTurnText();
         });
     }
-    
+
     private void OnOpponentDisconnected(OpponentDisconnectedMessage msg)
     {
         Dispatcher.UIThread.Post(() =>
@@ -90,8 +94,8 @@ public partial class MainWindow : Window
             FindMatchButton.IsEnabled = true;
         });
     }
-    
-    private void BuildGrids()
+
+    private void BuildGrids(CellState[] board)
     {
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
@@ -100,20 +104,22 @@ public partial class MainWindow : Window
         {
             for (int x = 0; x < GridModel.Size; x++)
             {
-                bool hasShip = (x + y) % 2 == 0;
-                var yourCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Player, hasShip);
+                var cellState = board[y * GridModel.Size + x];
+                bool hasShip = cellState == CellState.Ship;
+                bool isObstacle = cellState == CellState.Obstacle;
+                var yourCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Player, hasShip, isObstacle);
                 _yourButtons[x, y] = yourCell;
                 YourGrid.Children.Add(yourCell);
 
                 int capturedX = x, capturedY = y;
-                var enemyCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Enemy, hasShip);
+                var enemyCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Enemy, hasShip: false, isObstacle: false);
                 enemyCell.Click += async (_, _) => await OnEnemyCellClicked(capturedX, capturedY, enemyCell);
                 _enemyButtons[x, y] = enemyCell;
                 EnemyGrid.Children.Add(enemyCell);
             }
         }
     }
-    
+
     private async System.Threading.Tasks.Task OnEnemyCellClicked(int x, int y, Button clicked)
     {
         if (!_isMyTurn) return;
@@ -132,7 +138,7 @@ public partial class MainWindow : Window
             _ => _singleShotStrategy
         };
     }
-    
+
     private void UpdateTurnText()
     {
         TurnText.Text = _isMyTurn ? "Your turn" : "Opponent's turn";

@@ -26,10 +26,16 @@ public class GameHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, session.SessionId);
 
         await Clients.Client(opponentId)
-            .SendAsync("MatchFound", new MatchFoundMessage(session.SessionId, YouGoFirst: true));
+            .SendAsync("MatchFound", new MatchFoundMessage(
+                session.SessionId,
+                YouGoFirst: true,
+                session.GridA.ToFlatArray()));
 
         await Clients.Client(Context.ConnectionId)
-            .SendAsync("MatchFound", new MatchFoundMessage(session.SessionId, YouGoFirst: false));
+            .SendAsync("MatchFound", new MatchFoundMessage(
+                session.SessionId,
+                YouGoFirst: false,
+                session.GridB.ToFlatArray()));
     }
 
     public async Task FireShot(FireShotRequest request)
@@ -49,10 +55,10 @@ public class GameHub : Hub
             bool isYourTurnNext = i == lastIndex;
 
             await Clients.Client(Context.ConnectionId)
-                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, IsYourTurnNext: false));
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle, IsYourTurnNext: false));
 
             await Clients.Client(opponentId)
-                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, IsYourTurnNext: isYourTurnNext));
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle, IsYourTurnNext: isYourTurnNext));
         }
     }
 
