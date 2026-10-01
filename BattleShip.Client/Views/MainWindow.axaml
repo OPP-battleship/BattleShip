@@ -16,6 +16,18 @@
                         <Button Name="FindMatchButton" Content="Find Match" Click="OnFindMatchClicked" HorizontalAlignment="Stretch" Padding="0,10"/>
                         <TextBlock Name="StatusText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
                 </StackPanel>
+
+                <Grid Name="PlacementPanel" IsVisible="False" RowDefinitions="Auto,*" ColumnDefinitions="*,*" Margin="20">
+                        <TextBlock Text="Place your fleet" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Grid.ColumnSpan="2" Margin="0,0,0,12"/>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="8">
+                                <TextBlock Text="Your Board" FontSize="18" HorizontalAlignment="Center"/>
+                                <Panel Name="PlacementGrid"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="12" HorizontalAlignment="Center">
+                                <Panel Name="ShipSelectionGrid"/>
+                                <TextBlock Name="PlacementStatusText" Text="" HorizontalAlignment="Center" TextWrapping="Wrap"/>
+                        </StackPanel>
+                </Grid>
                 
                 <!--GAME SCREEN-->
                 <Grid Name="GamePanel" IsVisible="False" RowDefinitions="Auto,*" ColumnDefinitions="*,*" Margin="20">

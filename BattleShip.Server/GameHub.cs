@@ -26,16 +26,37 @@ public class GameHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, session.SessionId);
 
         await Clients.Client(opponentId)
-            .SendAsync("MatchFound", new MatchFoundMessage(
+            .SendAsync("PlacementStarted", new PlacementStartedMessage(
                 session.SessionId,
-                YouGoFirst: true,
                 session.GridA.ToFlatArray()));
 
         await Clients.Client(Context.ConnectionId)
-            .SendAsync("MatchFound", new MatchFoundMessage(
+            .SendAsync("PlacementStarted", new PlacementStartedMessage(
                 session.SessionId,
-                YouGoFirst: false,
                 session.GridB.ToFlatArray()));
+    }
+
+    public async Task SubmitShipPlacement(SubmitShipPlacementRequest request)
+    {
+        if (request is null ||
+            !SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) ||
+            session is null ||
+            request.SessionId != session.SessionId)
+        {
+            return;
+        }
+
+        bool started;
+        var placements = request.Ships ?? Array.Empty<ShipPlacement>();
+        if (!session.TrySubmitShipPlacement(Context.ConnectionId, placements, out started) || !started)
+        {
+            return;
+        }
+
+        await Clients.Client(session.PlayerAConnectionId)
+            .SendAsync("GameStarted", session.CreateGameStartedMessage(session.PlayerAConnectionId));
+        await Clients.Client(session.PlayerBConnectionId)
+            .SendAsync("GameStarted", session.CreateGameStartedMessage(session.PlayerBConnectionId));
     }
 
     public async Task FireShot(FireShotRequest request)

@@ -11,7 +11,8 @@ public class ConnectionService
     private HubConnection? _connection;
     public string? MyConnectionId => _connection?.ConnectionId;
 
-    public event Action<MatchFoundMessage>? MatchFound;
+    public event Action<PlacementStartedMessage>? PlacementStarted;
+    public event Action<GameStartedMessage>? GameStarted;
     public event Action<ShotResultMessage>? ShotResultReceived;
     public event Action<OpponentDisconnectedMessage>? OpponentDisconnected;
     
@@ -22,7 +23,8 @@ public class ConnectionService
             .WithAutomaticReconnect()
             .Build();
 
-        _connection.On<MatchFoundMessage>("MatchFound", msg => MatchFound?.Invoke(msg));
+        _connection.On<PlacementStartedMessage>("PlacementStarted", msg => PlacementStarted?.Invoke(msg));
+        _connection.On<GameStartedMessage>("GameStarted", msg => GameStarted?.Invoke(msg));
         _connection.On<ShotResultMessage>("ShotResult", msg => ShotResultReceived?.Invoke(msg));
         _connection.On<OpponentDisconnectedMessage>("OpponentDisconnected", msg => OpponentDisconnected?.Invoke(msg));
 
@@ -33,6 +35,12 @@ public class ConnectionService
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
         return _connection.InvokeAsync("FindMatch");
+    }
+
+    public Task SubmitShipPlacementAsync(string sessionId, IEnumerable<ShipPlacement> ships)
+    {
+        if (_connection is null) throw new InvalidOperationException("Not connected yet.");
+        return _connection.InvokeAsync("SubmitShipPlacement", new SubmitShipPlacementRequest(sessionId, ships.ToArray()));
     }
 
     public Task FireShotAsync(IEnumerable<ShotTarget> targets)

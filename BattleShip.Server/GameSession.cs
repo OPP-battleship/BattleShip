@@ -14,6 +14,9 @@ public class GameSession
     public string CurrentTurnConnectionId { get; private set; }
 
     private readonly object _lock = new();
+    private bool _playerAReady;
+    private bool _playerBReady;
+    private bool _isGameStarted;
 
     public GameSession(string playerA, string playerB, ILevelFactory levelFactory)
     {
@@ -37,6 +40,7 @@ public class GameSession
 
         lock (_lock)
         {
+            if (!_isGameStarted) return false;
             if (shooterConnectionId != CurrentTurnConnectionId) return false;
             if (targets.Count == 0) return false;
 
@@ -72,6 +76,64 @@ public class GameSession
             CurrentTurnConnectionId = defenderId;
             outcomes = results;
             return true;
+        }
+    }
+
+    internal bool TrySubmitShipPlacement(string connectionId, IReadOnlyList<ShipPlacement>? placements, out bool gameStarted)
+    {
+        gameStarted = false;
+
+        lock (_lock)
+        {
+            if (_isGameStarted || (connectionId != PlayerAConnectionId && connectionId != PlayerBConnectionId))
+            {
+                return false;
+            }
+
+            bool isPlayerA = connectionId == PlayerAConnectionId;
+            if ((isPlayerA && _playerAReady) || (!isPlayerA && _playerBReady))
+            {
+                return false;
+            }
+
+            if (!ShipPlacementRules.HasCompleteFleet(placements) || !GridOf(connectionId).TryPlaceShips(placements))
+            {
+                return false;
+            }
+
+            if (isPlayerA)
+            {
+                _playerAReady = true;
+            }
+            else
+            {
+                _playerBReady = true;
+            }
+
+            if (_playerAReady && _playerBReady)
+            {
+                _isGameStarted = true;
+                CurrentTurnConnectionId = PlayerAConnectionId;
+                gameStarted = true;
+            }
+
+            return true;
+        }
+    }
+
+    internal GameStartedMessage? CreateGameStartedMessage(string connectionId)
+    {
+        lock (_lock)
+        {
+            if (!_isGameStarted || (connectionId != PlayerAConnectionId && connectionId != PlayerBConnectionId))
+            {
+                return null;
+            }
+
+            return new GameStartedMessage(
+                SessionId,
+                YouGoFirst: connectionId == PlayerAConnectionId,
+                GridOf(connectionId).ToFlatArray());
         }
     }
 }

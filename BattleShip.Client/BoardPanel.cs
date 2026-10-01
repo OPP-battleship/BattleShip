@@ -42,6 +42,20 @@ public sealed class BoardPanel : UserControl
                 : Brushes.Gold;
     }
 
+    public void ApplyShipPlacement(ShipPlacement placement)
+    {
+        int dx = placement.Orientation == ShipOrientation.Horizontal ? 1 : 0;
+        int dy = placement.Orientation == ShipOrientation.Vertical ? 1 : 0;
+
+        for (int offset = 0; offset < placement.Length; offset++)
+        {
+            var cell = _cells[placement.X + dx * offset, placement.Y + dy * offset];
+            cell.Content = "X";
+            cell.Background = Brushes.SteelBlue;
+            cell.IsEnabled = false;
+        }
+    }
+
     private void OnCellClicked(int x, int y)
     {
         if (_fired[x, y]) return;

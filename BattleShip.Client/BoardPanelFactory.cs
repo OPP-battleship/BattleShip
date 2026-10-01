@@ -71,6 +71,11 @@ public sealed class BoardPanelFactory : IPanelFactory<BoardPanel>
                 button.Background = Brushes.Gray;
                 button.IsEnabled = true;
                 break;
+            case BoardCellOwner.Placement:
+                button.Content = state == CellState.Obstacle ? "#" : null;
+                button.Background = state == CellState.Obstacle ? Brushes.Gray : Brushes.LightBlue;
+                button.IsEnabled = state != CellState.Obstacle;
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(owner), owner, null);
         }

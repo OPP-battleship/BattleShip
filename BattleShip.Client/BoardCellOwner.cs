@@ -4,4 +4,5 @@ public enum BoardCellOwner
 {
     Player,
     Enemy,
+    Placement,
 }

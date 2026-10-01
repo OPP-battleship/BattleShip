@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using System;
+using System.Collections.Generic;
 using BattleShip.Shared;
 
 namespace BattleShip.Client.Views;
@@ -12,6 +13,7 @@ public partial class MainWindow : Window
 
     private readonly ConnectionService _connection = new();
     private readonly ControlsPanel _controlsPanel;
+    private readonly ShipPanel _shipPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
     private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
     private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
@@ -19,9 +21,13 @@ public partial class MainWindow : Window
 
     private BoardPanel? _yourBoard;
     private BoardPanel? _enemyBoard;
+    private BoardPanel? _placementBoard;
     private ScoreboardPanel? _scoreboard;
+    private readonly List<(int X, int Y)> _placementObstacles = [];
+    private readonly List<ShipPlacement> _shipPlacements = [];
 
     private string? _myConnectionId;
+    private string? _sessionId;
     private bool _isMyTurn;
 
     public MainWindow()
@@ -31,7 +37,12 @@ public partial class MainWindow : Window
         _controlsPanel = new ControlsPanelFactory().Create();
         ControlsGrid.Children.Add(_controlsPanel);
 
-        _connection.MatchFound += OnMatchFound;
+        _shipPanel = new ShipPanelFactory().Create();
+        _shipPanel.ReadyRequested += OnReadyRequested;
+        ShipSelectionGrid.Children.Add(_shipPanel);
+
+        _connection.PlacementStarted += OnPlacementStarted;
+        _connection.GameStarted += OnGameStarted;
         _connection.ShotResultReceived += OnShotResultReceived;
         _connection.OpponentDisconnected += OnOpponentDisconnected;
     }
@@ -56,14 +67,44 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnMatchFound(MatchFoundMessage msg)
+    private void OnPlacementStarted(PlacementStartedMessage msg)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _sessionId = msg.SessionId;
+            _placementObstacles.Clear();
+            for (int y = 0; y < GridModel.Size; y++)
+            {
+                for (int x = 0; x < GridModel.Size; x++)
+                {
+                    if (msg.Board[y * GridModel.Size + x] == CellState.Obstacle)
+                    {
+                        _placementObstacles.Add((x, y));
+                    }
+                }
+            }
+
+            _shipPlacements.Clear();
+            _shipPanel.Reset();
+            _placementBoard = new BoardPanelFactory(BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked).Create();
+            PlacementGrid.Children.Clear();
+            PlacementGrid.Children.Add(_placementBoard);
+
+            MenuPanel.IsVisible = false;
+            GamePanel.IsVisible = false;
+            PlacementPanel.IsVisible = true;
+            PlacementStatusText.Text = "Select a ship and click its starting cell. Ships cannot touch.";
+        });
+    }
+
+    private void OnGameStarted(GameStartedMessage msg)
     {
         Dispatcher.UIThread.Post(() =>
         {
             _isMyTurn = msg.YouGoFirst;
-            BuildGrids(msg.Board);
+            BuildGrids(msg.YourBoard);
             BuildScoreboard();
-            MenuPanel.IsVisible = false;
+            PlacementPanel.IsVisible = false;
             GamePanel.IsVisible = true;
             UpdateTurnText();
         });
@@ -93,10 +134,63 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             StatusText.Text = "Opponent disconnected.";
+            PlacementPanel.IsVisible = false;
             GamePanel.IsVisible = false;
             MenuPanel.IsVisible = true;
             FindMatchButton.IsEnabled = true;
+            _sessionId = null;
+            _shipPlacements.Clear();
+            _placementObstacles.Clear();
+            _placementBoard = null;
+            _shipPanel.Reset();
         });
+    }
+
+    private void OnPlacementCellClicked(int x, int y)
+    {
+        if (_placementBoard is null || !_shipPanel.CanPlaceSelectedShip)
+        {
+            return;
+        }
+
+        int length = _shipPanel.SelectedLength;
+        var placement = new ShipPlacement(x, y, length, _shipPanel.SelectedOrientation);
+        var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
+        var candidateGrid = new GridModel(_placementObstacles);
+
+        if (!candidateGrid.TryPlaceShips(tentativePlacements))
+        {
+            PlacementStatusText.Text = "That ship does not fit there. Check the board edges, obstacles, and spacing.";
+            return;
+        }
+
+        _shipPlacements.Add(placement);
+        _placementBoard.ApplyShipPlacement(placement);
+        _shipPanel.MarkShipPlaced(length);
+        PlacementStatusText.Text = _shipPanel.HasCompleteFleet
+            ? "Fleet complete. Select Ready to start when your opponent is ready."
+            : $"Placed length-{length} ship. Select another ship to continue.";
+    }
+
+    private async void OnReadyRequested()
+    {
+        if (!_shipPanel.HasCompleteFleet || string.IsNullOrEmpty(_sessionId))
+        {
+            return;
+        }
+
+        _shipPanel.MarkReady();
+        PlacementStatusText.Text = "Fleet submitted. Waiting for your opponent to finish placing ships...";
+
+        try
+        {
+            await _connection.SubmitShipPlacementAsync(_sessionId, _shipPlacements);
+        }
+        catch (Exception ex)
+        {
+            _shipPanel.CancelReady();
+            PlacementStatusText.Text = $"Could not submit fleet: {ex.Message}";
+        }
     }
 
     private void BuildGrids(CellState[] board)
@@ -107,7 +201,8 @@ public partial class MainWindow : Window
         _yourBoard = new BoardPanelFactory(BoardCellOwner.Player, board).Create();
         YourGrid.Children.Add(_yourBoard);
 
-        _enemyBoard = new BoardPanelFactory(BoardCellOwner.Enemy, board, OnEnemyCellClicked).Create();
+        var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
+        _enemyBoard = new BoardPanelFactory(BoardCellOwner.Enemy, hiddenEnemyBoard, OnEnemyCellClicked).Create();
         EnemyGrid.Children.Add(_enemyBoard);
     }
 
