@@ -3,7 +3,6 @@
 public class GridModel
 {
     public const int Size = 10;
-    private const int PrototypeShipCount = 25;
 
     private readonly CellState[,] _cells = new CellState[Size, Size];
 
@@ -23,32 +22,91 @@ public class GridModel
             _cells[x, y] = CellState.Obstacle;
         }
 
-        int shipsPlaced = 0;
-        for (int y = 0; y < Size && shipsPlaced < PrototypeShipCount; y++)
-        {
-            for (int x = 0; x < Size && shipsPlaced < PrototypeShipCount; x++)
-            {
-                if ((x + y) % 2 == 0 && (x / 2 + y / 2) % 2 == 0)
-                {
-                    int shipX = x;
-                    while (shipX < Size && _cells[shipX, y] != CellState.Empty)
-                    {
-                        shipX++;
-                    }
-
-                    if (shipX < Size)
-                    {
-                        _cells[shipX, y] = CellState.Ship;
-                        shipsPlaced++;
-                    }
-                }
-            }
-        }
     }
 
     public static bool IsInsideBounds(int x, int y) => x >= 0 && x < Size && y >= 0 && y < Size;
 
     public CellState GetCell(int x, int y) => _cells[x, y];
+
+    public bool TryPlaceShips(IReadOnlyList<ShipPlacement>? placements)
+    {
+        if (placements is null || placements.Count == 0)
+        {
+            return false;
+        }
+
+        var shipOwners = new int[Size, Size];
+        for (int x = 0; x < Size; x++)
+        {
+            for (int y = 0; y < Size; y++)
+            {
+                shipOwners[x, y] = -1;
+                if (_cells[x, y] is CellState.Ship or CellState.Fired)
+                {
+                    return false;
+                }
+            }
+        }
+
+        for (int shipIndex = 0; shipIndex < placements.Count; shipIndex++)
+        {
+            var placement = placements[shipIndex];
+            if (placement is null || placement.Length < 1 || placement.Length > Size)
+            {
+                return false;
+            }
+
+            (int dx, int dy) = placement.Orientation switch
+            {
+                ShipOrientation.Horizontal => (1, 0),
+                ShipOrientation.Vertical => (0, 1),
+                _ => (0, 0)
+            };
+
+            if (dx == 0 && dy == 0)
+            {
+                return false;
+            }
+
+            for (int offset = 0; offset < placement.Length; offset++)
+            {
+                int x = placement.X + dx * offset;
+                int y = placement.Y + dy * offset;
+                if (!IsInsideBounds(x, y) || _cells[x, y] != CellState.Empty || shipOwners[x, y] != -1)
+                {
+                    return false;
+                }
+
+                for (int neighborY = y - 1; neighborY <= y + 1; neighborY++)
+                {
+                    for (int neighborX = x - 1; neighborX <= x + 1; neighborX++)
+                    {
+                        if (IsInsideBounds(neighborX, neighborY) &&
+                            shipOwners[neighborX, neighborY] != -1 &&
+                            shipOwners[neighborX, neighborY] != shipIndex)
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                shipOwners[x, y] = shipIndex;
+            }
+        }
+
+        for (int x = 0; x < Size; x++)
+        {
+            for (int y = 0; y < Size; y++)
+            {
+                if (shipOwners[x, y] != -1)
+                {
+                    _cells[x, y] = CellState.Ship;
+                }
+            }
+        }
+
+        return true;
+    }
 
     public CellState[] ToFlatArray()
     {
