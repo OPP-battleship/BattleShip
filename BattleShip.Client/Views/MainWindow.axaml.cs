@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Media;
 using Avalonia.Threading;
 using System;
 using BattleShip.Shared;
@@ -12,13 +11,15 @@ public partial class MainWindow : Window
     private const string ServerUrl = "http://localhost:5058";
 
     private readonly ConnectionService _connection = new();
-    private readonly BoardFactory _BoardFactory = new();
-    private readonly Button[,] _yourButtons = new Button[GridModel.Size, GridModel.Size];
-    private readonly Button[,] _enemyButtons = new Button[GridModel.Size, GridModel.Size];
+    private readonly ControlsPanel _controlsPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
     private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
     private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
     private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
+
+    private BoardPanel? _yourBoard;
+    private BoardPanel? _enemyBoard;
+    private ScoreboardPanel? _scoreboard;
 
     private string? _myConnectionId;
     private bool _isMyTurn;
@@ -26,6 +27,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        _controlsPanel = new ControlsPanelFactory().Create();
+        ControlsGrid.Children.Add(_controlsPanel);
 
         _connection.MatchFound += OnMatchFound;
         _connection.ShotResultReceived += OnShotResultReceived;
@@ -58,6 +62,7 @@ public partial class MainWindow : Window
         {
             _isMyTurn = msg.YouGoFirst;
             BuildGrids(msg.Board);
+            BuildScoreboard();
             MenuPanel.IsVisible = false;
             GamePanel.IsVisible = true;
             UpdateTurnText();
@@ -69,15 +74,14 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
-            var grid = iShotThis ? _enemyButtons : _yourButtons;
 
-            var button = grid[msg.X, msg.Y];
-            button.Content = msg.IsHit || msg.IsObstacle ? "X" : "*";
-            button.Background = msg.IsObstacle
-                ? Brushes.Gray
-                : msg.IsHit
-                    ? Brushes.Red
-                    : Brushes.Gold;
+            var target = iShotThis ? _enemyBoard : _yourBoard;
+            target?.ApplyShot(msg.X, msg.Y, msg.IsHit, msg.IsObstacle);
+
+            if (msg.IsHit)
+            {
+                _scoreboard?.AddPoint(isYou: iShotThis);
+            }
 
             _isMyTurn = msg.IsYourTurnNext;
             UpdateTurnText();
@@ -100,30 +104,23 @@ public partial class MainWindow : Window
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
 
-        for (int y = 0; y < GridModel.Size; y++)
-        {
-            for (int x = 0; x < GridModel.Size; x++)
-            {
-                var cellState = board[y * GridModel.Size + x];
-                bool hasShip = cellState == CellState.Ship;
-                bool isObstacle = cellState == CellState.Obstacle;
-                var yourCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Player, hasShip, isObstacle);
-                _yourButtons[x, y] = yourCell;
-                YourGrid.Children.Add(yourCell);
+        _yourBoard = new BoardPanelFactory(BoardCellOwner.Player, board).Create();
+        YourGrid.Children.Add(_yourBoard);
 
-                int capturedX = x, capturedY = y;
-                var enemyCell = _BoardFactory.CreateBoardCell(BoardCellOwner.Enemy, hasShip: false, isObstacle: false);
-                enemyCell.Click += async (_, _) => await OnEnemyCellClicked(capturedX, capturedY, enemyCell);
-                _enemyButtons[x, y] = enemyCell;
-                EnemyGrid.Children.Add(enemyCell);
-            }
-        }
+        _enemyBoard = new BoardPanelFactory(BoardCellOwner.Enemy, board, OnEnemyCellClicked).Create();
+        EnemyGrid.Children.Add(_enemyBoard);
     }
 
-    private async System.Threading.Tasks.Task OnEnemyCellClicked(int x, int y, Button clicked)
+    private void BuildScoreboard()
+    {
+        _scoreboard = new ScoreboardPanelFactory().Create();
+
+        ScoreboardGrid.Children.Clear();
+        ScoreboardGrid.Children.Add(_scoreboard);
+    }
+    private async void OnEnemyCellClicked(int x, int y)
     {
         if (!_isMyTurn) return;
-        if (clicked.Content is not null) return; // already fired on this cell
 
         var shotStrategy = GetSelectedShotStrategy();
         await _connection.FireShotAsync(shotStrategy.GetTargets(x, y));
@@ -131,9 +128,9 @@ public partial class MainWindow : Window
 
     private IShotStrategy GetSelectedShotStrategy()
     {
-        return ShotModeComboBox.SelectedIndex switch
+        return _controlsPanel.ShotModeSelectedIndex switch
         {
-            1 => LineOrientationComboBox.SelectedIndex == 1 ? _verticalLineShotStrategy : _horizontalLineShotStrategy,
+            1 => _controlsPanel.LineOrientationSelectedIndex == 1 ? _verticalLineShotStrategy : _horizontalLineShotStrategy,
             2 => _spreadShotStrategy,
             _ => _singleShotStrategy
         };
