@@ -7,7 +7,7 @@ using System;
 
 namespace BattleShip.Client;
 
-public sealed class BoardPanelFactory : IPanelFactory<BoardPanel>
+public sealed class BoardPanelFactory : PanelFactory<BoardPanel>
 {
     private readonly BoardCellOwner _owner;
     private readonly CellState[] _board;
@@ -21,7 +21,7 @@ public sealed class BoardPanelFactory : IPanelFactory<BoardPanel>
         _cellClicked = cellClicked;
     }
 
-    public BoardPanel Create()
+    protected override BoardPanel CreatePanel()
     {
         var grid = new UniformGrid
         {

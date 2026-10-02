@@ -4,9 +4,9 @@ using Avalonia.Media;
 
 namespace BattleShip.Client;
 
-public sealed class ScoreboardPanelFactory : IPanelFactory<ScoreboardPanel>
+public sealed class ScoreboardPanelFactory : PanelFactory<ScoreboardPanel>
 {
-    public ScoreboardPanel Create()
+    protected override ScoreboardPanel CreatePanel()
     {
         var yourScoreText = new TextBlock { FontSize = 16 };
         var enemyScoreText = new TextBlock { FontSize = 16 };

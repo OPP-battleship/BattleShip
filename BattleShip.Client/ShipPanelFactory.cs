@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
-public sealed class ShipPanelFactory : IPanelFactory<ShipPanel>
+public sealed class ShipPanelFactory : PanelFactory<ShipPanel>
 {
-    public ShipPanel Create()
+    protected override ShipPanel CreatePanel()
     {
         var shipButtons = new Dictionary<int, Button>
         {

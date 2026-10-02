@@ -3,9 +3,9 @@ using Avalonia.Layout;
 
 namespace BattleShip.Client;
 
-public sealed class ControlsPanelFactory : IPanelFactory<ControlsPanel>
+public sealed class ControlsPanelFactory : PanelFactory<ControlsPanel>
 {
-    public ControlsPanel Create()
+    protected override ControlsPanel CreatePanel()
     {
         var shotModeComboBox = new ComboBox
         {
