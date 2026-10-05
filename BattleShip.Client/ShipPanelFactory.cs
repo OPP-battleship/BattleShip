@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
-public sealed class ShipPanelFactory : PanelFactory<ShipPanel>
+public sealed class ShipPanelFactory : PanelFactory<Panel>
 {
-    protected override ShipPanel CreatePanel()
+    protected override Panel CreatePanel()
     {
         var shipButtons = new Dictionary<int, Button>
         {
@@ -32,9 +32,8 @@ public sealed class ShipPanelFactory : PanelFactory<ShipPanel>
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
-        return new ShipPanel(shipButtons, orientationComboBox, readyButton)
+        var layout = new StackPanel
         {
-            Name = "ShipPanel",
             Spacing = 8,
             Children =
             {
@@ -48,5 +47,7 @@ public sealed class ShipPanelFactory : PanelFactory<ShipPanel>
                 readyButton,
             },
         };
+
+        return new Panel(layout, shipButtons, orientationComboBox, readyButton);
     }
 }

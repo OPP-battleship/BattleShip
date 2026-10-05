@@ -3,9 +3,9 @@ using Avalonia.Layout;
 
 namespace BattleShip.Client;
 
-public sealed class ControlsPanelFactory : PanelFactory<ControlsPanel>
+public sealed class ControlsPanelFactory : PanelFactory<Panel>
 {
-    protected override ControlsPanel CreatePanel()
+    protected override Panel CreatePanel()
     {
         var shotModeComboBox = new ComboBox
         {
@@ -30,7 +30,7 @@ public sealed class ControlsPanelFactory : PanelFactory<ControlsPanel>
             },
         };
 
-        return new ControlsPanel(shotModeComboBox, lineOrientationComboBox)
+        var layout = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -57,5 +57,7 @@ public sealed class ControlsPanelFactory : PanelFactory<ControlsPanel>
                 },
             },
         };
+
+        return new Panel(layout, shotModeComboBox, lineOrientationComboBox);
     }
 }

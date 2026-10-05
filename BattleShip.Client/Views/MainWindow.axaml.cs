@@ -12,17 +12,17 @@ public partial class MainWindow : Window
     private const string ServerUrl = "http://localhost:5058";
 
     private readonly ConnectionService _connection = new();
-    private readonly ControlsPanel _controlsPanel;
-    private readonly ShipPanel _shipPanel;
+    private readonly BattleShip.Client.Panel _controlsPanel;
+    private readonly BattleShip.Client.Panel _shipPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
     private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
     private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
     private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
 
-    private BoardPanel? _yourBoard;
-    private BoardPanel? _enemyBoard;
-    private BoardPanel? _placementBoard;
-    private ScoreboardPanel? _scoreboard;
+    private BattleShip.Client.Panel? _yourBoard;
+    private BattleShip.Client.Panel? _enemyBoard;
+    private BattleShip.Client.Panel? _placementBoard;
+    private BattleShip.Client.Panel? _scoreboard;
     private readonly List<(int X, int Y)> _placementObstacles = [];
     private readonly List<ShipPlacement> _shipPlacements = [];
 
