@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private const string ServerUrl = "http://localhost:5058";
 
     private readonly ConnectionService _connection = new();
+    private readonly PanelFactory _panelFactory = new();
     private readonly BattleShip.Client.Panel _controlsPanel;
     private readonly BattleShip.Client.Panel _shipPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
@@ -34,10 +35,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _controlsPanel = new ControlsPanelFactory().Create();
+        _controlsPanel = _panelFactory.Create(PanelFactory.Controls);
         ControlsGrid.Children.Add(_controlsPanel);
 
-        _shipPanel = new ShipPanelFactory().Create();
+        _shipPanel = _panelFactory.Create(PanelFactory.Ships);
         _shipPanel.ReadyRequested += OnReadyRequested;
         ShipSelectionGrid.Children.Add(_shipPanel);
 
@@ -86,7 +87,8 @@ public partial class MainWindow : Window
 
             _shipPlacements.Clear();
             _shipPanel.Reset();
-            _placementBoard = new BoardPanelFactory(BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked).Create();
+            _placementBoard = _panelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement,
+                msg.Board, OnPlacementCellClicked);
             PlacementGrid.Children.Clear();
             PlacementGrid.Children.Add(_placementBoard);
 
@@ -198,17 +200,18 @@ public partial class MainWindow : Window
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
 
-        _yourBoard = new BoardPanelFactory(BoardCellOwner.Player, board).Create();
+        _yourBoard = _panelFactory.Create(PanelFactory.Board, BoardCellOwner.Player, board);
         YourGrid.Children.Add(_yourBoard);
 
         var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
-        _enemyBoard = new BoardPanelFactory(BoardCellOwner.Enemy, hiddenEnemyBoard, OnEnemyCellClicked).Create();
+        _enemyBoard = _panelFactory.Create(PanelFactory.Board, BoardCellOwner.Enemy, hiddenEnemyBoard,
+            OnEnemyCellClicked);
         EnemyGrid.Children.Add(_enemyBoard);
     }
 
     private void BuildScoreboard()
     {
-        _scoreboard = new ScoreboardPanelFactory().Create();
+        _scoreboard = _panelFactory.Create(PanelFactory.Scoreboard);
 
         ScoreboardGrid.Children.Clear();
         ScoreboardGrid.Children.Add(_scoreboard);
