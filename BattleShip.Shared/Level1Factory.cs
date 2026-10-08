@@ -1,21 +1,30 @@
 namespace BattleShip.Shared;
 
-public sealed class Level1Factory : ILevelFactory
+public sealed class Level1Factory : LevelFactory
 {
-    private static readonly (int X, int Y)[] PlayerAObstacles =
-    [
-        (1, 0), (8, 3), (3, 6), (7, 9)
-    ];
-
-    private static readonly (int X, int Y)[] PlayerBObstacles =
-    [
-        (8, 0), (2, 3), (6, 6), (1, 9)
-    ];
-
-    public GridModel CreateGrid(BoardLayout boardLayout) => new(boardLayout switch
+    public override IReadOnlyList<Obstacle> GetObstacles(BoardLayout boardLayout) => boardLayout switch
     {
-        BoardLayout.PlayerA => PlayerAObstacles,
-        BoardLayout.PlayerB => PlayerBObstacles,
+        BoardLayout.PlayerA =>
+        [
+            new SmallObstacle(new GridPosition(1, 0)),
+            new SmallObstacle(new GridPosition(8, 3)),
+            new SmallObstacle(new GridPosition(3, 6)),
+            new SmallObstacle(new GridPosition(7, 9))
+        ],
+        BoardLayout.PlayerB =>
+        [
+            new SmallObstacle(new GridPosition(8, 0)),
+            new SmallObstacle(new GridPosition(2, 3)),
+            new SmallObstacle(new GridPosition(6, 6)),
+            new SmallObstacle(new GridPosition(1, 9))
+        ],
         _ => throw new ArgumentOutOfRangeException(nameof(boardLayout), boardLayout, null)
-    });
+    };
+
+    public override IReadOnlyList<PowerUp> GetPowerUps(BoardLayout boardLayout) => boardLayout switch
+    {
+        BoardLayout.PlayerA => [new ExtraTurn(new GridPosition(4, 4))],
+        BoardLayout.PlayerB => [new ExtraTurn(new GridPosition(5, 5))],
+        _ => throw new ArgumentOutOfRangeException(nameof(boardLayout), boardLayout, null)
+    };
 }

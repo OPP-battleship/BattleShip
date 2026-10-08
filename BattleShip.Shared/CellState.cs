@@ -5,5 +5,6 @@ public enum CellState
     Empty,
     Ship,
     Obstacle,
-    Fired
+    Fired,
+    PowerUp
 }

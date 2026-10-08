@@ -18,12 +18,16 @@ public class GameSession
     private bool _playerBReady;
     private bool _isGameStarted;
 
-    public GameSession(string playerA, string playerB, ILevelFactory levelFactory)
+    public GameSession(string playerA, string playerB, LevelFactory levelFactory)
     {
         PlayerAConnectionId = playerA;
         PlayerBConnectionId = playerB;
-        GridA = levelFactory.CreateGrid(BoardLayout.PlayerA);
-        GridB = levelFactory.CreateGrid(BoardLayout.PlayerB);
+        GridA = new GridModel(
+            levelFactory.GetObstacles(BoardLayout.PlayerA),
+            levelFactory.GetPowerUps(BoardLayout.PlayerA));
+        GridB = new GridModel(
+            levelFactory.GetObstacles(BoardLayout.PlayerB),
+            levelFactory.GetPowerUps(BoardLayout.PlayerB));
         CurrentTurnConnectionId = playerA; // player A always go first
     }
 
