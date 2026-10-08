@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     private BattleShip.Client.Panel? _enemyBoard;
     private BattleShip.Client.Panel? _placementBoard;
     private BattleShip.Client.Panel? _scoreboard;
-    private readonly List<(int X, int Y)> _placementObstacles = [];
+    private readonly List<(int X, int Y)> _placementBlockedCells = [];
     private readonly List<ShipPlacement> _shipPlacements = [];
 
     private string? _myConnectionId;
@@ -73,14 +73,14 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             _sessionId = msg.SessionId;
-            _placementObstacles.Clear();
+            _placementBlockedCells.Clear();
             for (int y = 0; y < GridModel.Size; y++)
             {
                 for (int x = 0; x < GridModel.Size; x++)
                 {
-                    if (msg.Board[y * GridModel.Size + x] == CellState.Obstacle)
+                    if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
                     {
-                        _placementObstacles.Add((x, y));
+                        _placementBlockedCells.Add((x, y));
                     }
                 }
             }
@@ -142,7 +142,7 @@ public partial class MainWindow : Window
             FindMatchButton.IsEnabled = true;
             _sessionId = null;
             _shipPlacements.Clear();
-            _placementObstacles.Clear();
+            _placementBlockedCells.Clear();
             _placementBoard = null;
             _shipPanel.Reset();
         });
@@ -158,7 +158,7 @@ public partial class MainWindow : Window
         int length = _shipPanel.SelectedLength;
         var placement = new ShipPlacement(x, y, length, _shipPanel.SelectedOrientation);
         var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
-        var candidateGrid = new GridModel(_placementObstacles);
+        var candidateGrid = new GridModel(_placementBlockedCells);
 
         if (!candidateGrid.TryPlaceShips(tentativePlacements))
         {

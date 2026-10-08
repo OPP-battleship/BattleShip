@@ -6,22 +6,48 @@ public class GridModel
 
     private readonly CellState[,] _cells = new CellState[Size, Size];
 
-    public GridModel() : this(Array.Empty<(int X, int Y)>())
+    public GridModel() : this(Array.Empty<Obstacle>(), Array.Empty<PowerUp>())
     {
     }
 
-    public GridModel(IEnumerable<(int X, int Y)> obstacles)
+    public GridModel(IEnumerable<(int X, int Y)> obstacles) : this(
+        obstacles.Select(position => (Obstacle)new SmallObstacle(new GridPosition(position.X, position.Y))),
+        Array.Empty<PowerUp>())
     {
-        foreach (var (x, y) in obstacles)
-        {
-            if (!IsInsideBounds(x, y))
-            {
-                throw new ArgumentOutOfRangeException(nameof(obstacles));
-            }
+    }
 
-            _cells[x, y] = CellState.Obstacle;
+    public GridModel(IEnumerable<Obstacle> obstacles, IEnumerable<PowerUp> powerUps)
+    {
+        ArgumentNullException.ThrowIfNull(obstacles);
+        ArgumentNullException.ThrowIfNull(powerUps);
+
+        foreach (var obstacle in obstacles)
+        {
+            foreach (var position in obstacle.GetOccupiedCells())
+            {
+                PlaceInitialCell(position, CellState.Obstacle);
+            }
         }
 
+        foreach (var powerUp in powerUps)
+        {
+            PlaceInitialCell(powerUp.Position, CellState.PowerUp);
+        }
+    }
+
+    private void PlaceInitialCell(GridPosition position, CellState cellState)
+    {
+        if (!IsInsideBounds(position.X, position.Y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+
+        if (_cells[position.X, position.Y] != CellState.Empty)
+        {
+            throw new ArgumentException($"Multiple board items use cell ({position.X}, {position.Y}).");
+        }
+
+        _cells[position.X, position.Y] = cellState;
     }
 
     public static bool IsInsideBounds(int x, int y) => x >= 0 && x < Size && y >= 0 && y < Size;

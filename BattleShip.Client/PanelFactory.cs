@@ -83,8 +83,19 @@ public sealed class PanelFactory
         switch (owner)
         {
             case BoardCellOwner.Player:
-                button.Content = state == CellState.Ship ? "X" : state == CellState.Obstacle ? "#" : null;
-                button.Background = state == CellState.Ship ? Brushes.SteelBlue : Brushes.Gray;
+                button.Content = state switch
+                {
+                    CellState.Ship => "X",
+                    CellState.Obstacle => "#",
+                    CellState.PowerUp => "P",
+                    _ => null
+                };
+                button.Background = state switch
+                {
+                    CellState.Ship => Brushes.SteelBlue,
+                    CellState.PowerUp => Brushes.Gold,
+                    _ => Brushes.Gray
+                };
                 button.IsHitTestVisible = false;
                 break;
             case BoardCellOwner.Enemy:
@@ -92,9 +103,19 @@ public sealed class PanelFactory
                 button.IsEnabled = true;
                 break;
             case BoardCellOwner.Placement:
-                button.Content = state == CellState.Obstacle ? "#" : null;
-                button.Background = state == CellState.Obstacle ? Brushes.Gray : Brushes.LightBlue;
-                button.IsEnabled = state != CellState.Obstacle;
+                button.Content = state switch
+                {
+                    CellState.Obstacle => "#",
+                    CellState.PowerUp => "P",
+                    _ => null
+                };
+                button.Background = state switch
+                {
+                    CellState.Obstacle => Brushes.Gray,
+                    CellState.PowerUp => Brushes.Gold,
+                    _ => Brushes.LightBlue
+                };
+                button.IsEnabled = state == CellState.Empty;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(owner), owner, null);
