@@ -12,18 +12,17 @@ public partial class MainWindow : Window
     private const string ServerUrl = "http://localhost:5058";
 
     private readonly ConnectionService _connection = new();
-    private readonly PanelFactory _panelFactory = new();
-    private readonly BattleShip.Client.ControlsPanel _controlsPanel;
-    private readonly BattleShip.Client.ShipPanel _shipPanel;
+    private readonly ControlsPanel _controlsPanel;
+    private readonly ShipPanel _shipPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
     private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
     private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
     private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
 
-    private BattleShip.Client.BoardPanel? _yourBoard;
-    private BattleShip.Client.BoardPanel? _enemyBoard;
-    private BattleShip.Client.BoardPanel? _placementBoard;
-    private BattleShip.Client.ScoreboardPanel? _scoreboard;
+    private BoardPanel? _yourBoard;
+    private BoardPanel? _enemyBoard;
+    private BoardPanel? _placementBoard;
+    private ScoreboardPanel? _scoreboard;
     private readonly List<(int X, int Y)> _placementBlockedCells = [];
     private readonly List<ShipPlacement> _shipPlacements = [];
 
@@ -35,10 +34,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _controlsPanel = (BattleShip.Client.ControlsPanel)_panelFactory.Create(PanelFactory.Controls);
+        _controlsPanel = (ControlsPanel)PanelFactory.Create(PanelFactory.Controls);
         ControlsGrid.Children.Add(_controlsPanel);
 
-        _shipPanel = (BattleShip.Client.ShipPanel)_panelFactory.Create(PanelFactory.Ships);
+        _shipPanel = (ShipPanel)PanelFactory.Create(PanelFactory.Ships);
         _shipPanel.ReadyRequested += OnReadyRequested;
         ShipSelectionGrid.Children.Add(_shipPanel);
 
@@ -87,8 +86,7 @@ public partial class MainWindow : Window
 
             _shipPlacements.Clear();
             _shipPanel.Reset();
-            _placementBoard = (BattleShip.Client.BoardPanel)_panelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement,
-                msg.Board, OnPlacementCellClicked);
+            _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked);
             PlacementGrid.Children.Clear();
             PlacementGrid.Children.Add(_placementBoard);
 
@@ -200,18 +198,18 @@ public partial class MainWindow : Window
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
 
-        _yourBoard = (BattleShip.Client.BoardPanel)_panelFactory.Create(PanelFactory.Board, BoardCellOwner.Player, board);
+        _yourBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Player, board);
         YourGrid.Children.Add(_yourBoard);
 
         var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
-        _enemyBoard = (BattleShip.Client.BoardPanel)_panelFactory.Create(PanelFactory.Board, BoardCellOwner.Enemy, hiddenEnemyBoard,
+        _enemyBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Enemy, hiddenEnemyBoard,
             OnEnemyCellClicked);
         EnemyGrid.Children.Add(_enemyBoard);
     }
 
     private void BuildScoreboard()
     {
-        _scoreboard = (BattleShip.Client.ScoreboardPanel)_panelFactory.Create(PanelFactory.Scoreboard);
+        _scoreboard = (BattleShip.Client.ScoreboardPanel)PanelFactory.Create(PanelFactory.Scoreboard);
 
         ScoreboardGrid.Children.Clear();
         ScoreboardGrid.Children.Add(_scoreboard);

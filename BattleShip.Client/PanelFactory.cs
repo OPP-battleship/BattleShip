@@ -9,14 +9,14 @@ using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
-public sealed class PanelFactory
+public static class PanelFactory
 {
     public const string Board = "Board";
     public const string Controls = "Controls";
     public const string Scoreboard = "Scoreboard";
     public const string Ships = "Ships";
 
-    public Panel Create(string panelType, BoardCellOwner? owner = null, CellState[]? board = null,
+    public static Panel Create(string panelType, BoardCellOwner? owner = null, CellState[]? board = null,
         Action<int, int>? cellClicked = null)
     {
         switch (panelType)
