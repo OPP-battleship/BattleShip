@@ -9,14 +9,14 @@ using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
-public sealed class PanelFactory
+public static class PanelFactory
 {
     public const string Board = "Board";
     public const string Controls = "Controls";
     public const string Scoreboard = "Scoreboard";
     public const string Ships = "Ships";
 
-    public Panel Create(string panelType, BoardCellOwner? owner = null, CellState[]? board = null,
+    public static Panel Create(string panelType, BoardCellOwner? owner = null, CellState[]? board = null,
         Action<int, int>? cellClicked = null)
     {
         switch (panelType)
@@ -40,7 +40,7 @@ public sealed class PanelFactory
         }
     }
 
-    private static Panel CreateBoardPanel(BoardCellOwner owner, CellState[] board,
+    private static BoardPanel CreateBoardPanel(BoardCellOwner owner, CellState[] board,
         Action<int, int>? cellClicked)
     {
         var grid = new UniformGrid
@@ -63,7 +63,7 @@ public sealed class PanelFactory
             }
         }
 
-        var panel = new Panel(grid, cells);
+        var panel = new BoardPanel(grid, cells);
 
         if (cellClicked is not null)
         {
@@ -124,7 +124,7 @@ public sealed class PanelFactory
         return button;
     }
 
-    private static Panel CreateControlsPanel()
+    private static ControlsPanel CreateControlsPanel()
     {
         var shotModeComboBox = new ComboBox
         {
@@ -177,10 +177,10 @@ public sealed class PanelFactory
             },
         };
 
-        return new Panel(layout, shotModeComboBox, lineOrientationComboBox);
+        return new ControlsPanel(layout, shotModeComboBox, lineOrientationComboBox);
     }
 
-    private static Panel CreateScoreboardPanel()
+    private static ScoreboardPanel CreateScoreboardPanel()
     {
         var yourScoreText = new TextBlock { FontSize = 16 };
         var enemyScoreText = new TextBlock { FontSize = 16 };
@@ -198,10 +198,10 @@ public sealed class PanelFactory
             },
         };
 
-        return new Panel(layout, yourScoreText, enemyScoreText);
+        return new ScoreboardPanel(layout, yourScoreText, enemyScoreText);
     }
 
-    private static Panel CreateShipPanel()
+    private static ShipPanel CreateShipPanel()
     {
         var shipButtons = new Dictionary<int, Button>
         {
@@ -243,6 +243,6 @@ public sealed class PanelFactory
             },
         };
 
-        return new Panel(layout, shipButtons, orientationComboBox, readyButton);
+        return new ShipPanel(layout, shipButtons, orientationComboBox, readyButton);
     }
 }
