@@ -1,13 +1,11 @@
 namespace BattleShip.Shared;
 
-public abstract class PowerUp
+public abstract class PowerUp : BoardItem
 {
-    protected PowerUp(GridPosition position, string effect)
+    protected PowerUp(GridPosition position, string effect) : base(position)
     {
-        Position = position;
         Effect = effect;
     }
 
-    public GridPosition Position { get; }
     public string Effect { get; }
 }
