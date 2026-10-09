@@ -31,7 +31,10 @@ public class GridModel
 
         foreach (var powerUp in powerUps)
         {
-            PlaceInitialCell(powerUp.Position, CellState.PowerUp);
+            foreach (var position in powerUp.GetOccupiedCells())
+            {
+                PlaceInitialCell(position, CellState.PowerUp);
+            }
         }
     }
 

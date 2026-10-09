@@ -1,13 +1,8 @@
 namespace BattleShip.Shared;
 
-public abstract class Obstacle
+public abstract class Obstacle : BoardItem
 {
-    protected Obstacle(GridPosition position)
+    protected Obstacle(GridPosition position) : base(position)
     {
-        Position = position;
     }
-
-    public GridPosition Position { get; }
-
-    public abstract IEnumerable<GridPosition> GetOccupiedCells();
 }

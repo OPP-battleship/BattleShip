@@ -9,14 +9,16 @@ public sealed class Level1Factory : LevelFactory
             new SmallObstacle(new GridPosition(1, 0)),
             new SmallObstacle(new GridPosition(8, 3)),
             new SmallObstacle(new GridPosition(3, 6)),
-            new SmallObstacle(new GridPosition(7, 9))
+            new SmallObstacle(new GridPosition(7, 9)),
+            new SmallObstacle(new GridPosition(2, 2))
         ],
         BoardLayout.PlayerB =>
         [
             new SmallObstacle(new GridPosition(8, 0)),
             new SmallObstacle(new GridPosition(2, 3)),
             new SmallObstacle(new GridPosition(6, 6)),
-            new SmallObstacle(new GridPosition(1, 9))
+            new SmallObstacle(new GridPosition(1, 9)),
+            new SmallObstacle(new GridPosition(7, 2))
         ],
         _ => throw new ArgumentOutOfRangeException(nameof(boardLayout), boardLayout, null)
     };
