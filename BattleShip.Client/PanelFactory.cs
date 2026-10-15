@@ -135,6 +135,7 @@ public static class PanelFactory
                 new ComboBoxItem { Content = "Single Shot" },
                 new ComboBoxItem { Content = "Line Shot" },
                 new ComboBoxItem { Content = "Spread Shot" },
+                new ComboBoxItem { Content = "Ring Shot" },
             },
         };
 
@@ -227,6 +228,12 @@ public static class PanelFactory
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
+        var undoButton = new Button
+        {
+            Content = "Undo",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
         var layout = new StackPanel
         {
             Spacing = 8,
@@ -240,9 +247,10 @@ public static class PanelFactory
                 new TextBlock { Text = "Orientation" },
                 orientationComboBox,
                 readyButton,
+                undoButton,
             },
         };
 
-        return new ShipPanel(layout, shipButtons, orientationComboBox, readyButton);
+        return new ShipPanel(layout, shipButtons, orientationComboBox, readyButton, undoButton);
     }
 }

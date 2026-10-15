@@ -20,17 +20,21 @@ internal sealed class ShipPanel : Panel
     };
     private readonly ComboBox _shipOrientationComboBox;
     private readonly Button _readyButton;
+    private readonly Button _undoButton;
+    private bool _undoEnabled;
     private bool _isReady;
 
     public event Action? ReadyRequested;
+    public event Action? UndoRequested;
 
     internal ShipPanel(Avalonia.Controls.Panel layout, Dictionary<int, Button> shipButtons,
-        ComboBox orientationComboBox, Button readyButton)
+        ComboBox orientationComboBox, Button readyButton, Button undoButton)
         : base(layout)
     {
         _shipButtons = shipButtons;
         _shipOrientationComboBox = orientationComboBox;
         _readyButton = readyButton;
+        _undoButton = undoButton;
 
         foreach (var (length, button) in _shipButtons)
         {
@@ -42,6 +46,7 @@ internal sealed class ShipPanel : Panel
         }
 
         _readyButton.Click += (_, _) => ReadyRequested?.Invoke();
+        _undoButton.Click += (_, _) => UndoRequested?.Invoke();
         SelectedLength = 4;
         RefreshShipButtons();
     }
@@ -85,6 +90,24 @@ internal sealed class ShipPanel : Panel
         RefreshShipButtons();
     }
 
+    public void MarkShipRemoved(int length)
+    {
+        if (!_remainingShips.ContainsKey(length))
+        {
+            return;
+        }
+
+        _remainingShips[length]++;
+        _isReady = false;
+        RefreshShipButtons();
+    }
+
+    public void SetUndoEnabled(bool enabled)
+    {
+        _undoEnabled = enabled;
+        RefreshShipButtons();
+    }
+
     public void Reset()
     {
         _remainingShips[4] = 1;
@@ -92,6 +115,7 @@ internal sealed class ShipPanel : Panel
         _remainingShips[2] = 3;
         _remainingShips[1] = 4;
         SelectedLength = 4;
+        _undoEnabled = false;
         _isReady = false;
         RefreshShipButtons();
     }
@@ -107,5 +131,6 @@ internal sealed class ShipPanel : Panel
         }
 
         _readyButton.IsEnabled = HasCompleteFleet && !_isReady;
+        _undoButton.IsEnabled = _undoEnabled && !_isReady;
     }
 }
