@@ -7,7 +7,7 @@ using BattleShip.Shared;
 
 namespace BattleShip.Client.Views;
 
-public partial class MainWindow : Window, IGameEventObserver
+public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandReceiver
 {
     private const string ServerUrl = "http://localhost:5058";
 
@@ -19,13 +19,16 @@ public partial class MainWindow : Window, IGameEventObserver
     private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
     private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
     private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
+    private readonly IShotStrategy _ringShotStrategy = new RingShotStrategy();
 
     private BoardPanel? _yourBoard;
     private BoardPanel? _enemyBoard;
     private BoardPanel? _placementBoard;
     private ScoreboardPanel? _scoreboard;
+    private readonly PlacementCommandInvoker _placementCommands = new();
     private readonly List<(int X, int Y)> _placementBlockedCells = [];
     private readonly List<ShipPlacement> _shipPlacements = [];
+    private CellState[]? _placementBoardState;
 
     private string? _myConnectionId;
     private string? _sessionId;
@@ -40,6 +43,7 @@ public partial class MainWindow : Window, IGameEventObserver
 
         _shipPanel = (ShipPanel)PanelFactory.Create(PanelFactory.Ships);
         _shipPanel.ReadyRequested += OnReadyRequested;
+        _shipPanel.UndoRequested += OnUndoRequested;
         ShipSelectionGrid.Children.Add(_shipPanel);
 
         _gameEventObserver = new UiThreadGameEventObserverDecorator(
@@ -72,6 +76,7 @@ public partial class MainWindow : Window, IGameEventObserver
     public void OnPlacementStarted(PlacementStartedMessage msg)
     {
         _sessionId = msg.SessionId;
+        _placementBoardState = (CellState[])msg.Board.Clone();
         _placementBlockedCells.Clear();
         for (int y = 0; y < GridModel.Size; y++)
         {
@@ -86,9 +91,9 @@ public partial class MainWindow : Window, IGameEventObserver
 
         _shipPlacements.Clear();
         _shipPanel.Reset();
-        _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked);
-        PlacementGrid.Children.Clear();
-        PlacementGrid.Children.Add(_placementBoard);
+        _placementCommands.Clear();
+        RefreshPlacementBoard();
+        _shipPanel.SetUndoEnabled(false);
 
         MenuPanel.IsVisible = false;
         GamePanel.IsVisible = false;
@@ -133,7 +138,10 @@ public partial class MainWindow : Window, IGameEventObserver
         _shipPlacements.Clear();
         _placementBlockedCells.Clear();
         _placementBoard = null;
+        _placementBoardState = null;
+        _placementCommands.Clear();
         _shipPanel.Reset();
+        _shipPanel.SetUndoEnabled(false);
     }
 
     private void OnPlacementCellClicked(int x, int y)
@@ -145,21 +153,26 @@ public partial class MainWindow : Window, IGameEventObserver
 
         int length = _shipPanel.SelectedLength;
         var placement = new ShipPlacement(x, y, length, _shipPanel.SelectedOrientation);
-        var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
-        var candidateGrid = new GridModel(_placementBlockedCells);
+        var command = new PlaceShipCommand(this, placement);
 
-        if (!candidateGrid.TryPlaceShips(tentativePlacements))
+        if (!_placementCommands.TryExecute(command, out var failureMessage))
         {
-            PlacementStatusText.Text = "That ship does not fit there. Check the board edges, obstacles, and spacing.";
+            PlacementStatusText.Text = failureMessage ?? "That ship does not fit there. Check the board edges, obstacles, and spacing.";
             return;
         }
 
-        _shipPlacements.Add(placement);
-        _placementBoard.ApplyShipPlacement(placement);
-        _shipPanel.MarkShipPlaced(length);
-        PlacementStatusText.Text = _shipPanel.HasCompleteFleet
-            ? "Fleet complete. Select Ready to start when your opponent is ready."
-            : $"Placed length-{length} ship. Select another ship to continue.";
+        _shipPanel.SetUndoEnabled(_placementCommands.CanUndo);
+    }
+
+    private void OnUndoRequested()
+    {
+        if (!_placementCommands.TryUndo(out var failureMessage))
+        {
+            PlacementStatusText.Text = failureMessage ?? "Nothing to undo.";
+            return;
+        }
+
+        _shipPanel.SetUndoEnabled(_placementCommands.CanUndo);
     }
 
     private async void OnReadyRequested()
@@ -181,6 +194,69 @@ public partial class MainWindow : Window, IGameEventObserver
             _shipPanel.CancelReady();
             PlacementStatusText.Text = $"Could not submit fleet: {ex.Message}";
         }
+    }
+
+    public bool CanPlaceShip(ShipPlacement placement, out string failureMessage)
+    {
+        failureMessage = "";
+
+        if (_placementBoardState is null)
+        {
+            failureMessage = "Placement board is not ready yet.";
+            return false;
+        }
+
+        var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
+        var candidateGrid = new GridModel(_placementBlockedCells);
+
+        if (!candidateGrid.TryPlaceShips(tentativePlacements))
+        {
+            failureMessage = "That ship does not fit there. Check the board edges, obstacles, and spacing.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public void CommitPlacement(ShipPlacement placement)
+    {
+        _shipPlacements.Add(placement);
+        RefreshPlacementBoard();
+        _shipPanel.MarkShipPlaced(placement.Length);
+        PlacementStatusText.Text = _shipPanel.HasCompleteFleet
+            ? "Fleet complete. Select Ready to start when your opponent is ready."
+            : $"Placed length-{placement.Length} ship. Select another ship to continue.";
+    }
+
+    public void RevertPlacement(ShipPlacement placement)
+    {
+        if (!_shipPlacements.Remove(placement))
+        {
+            return;
+        }
+
+        RefreshPlacementBoard();
+        _shipPanel.MarkShipRemoved(placement.Length);
+        PlacementStatusText.Text = _shipPlacements.Count == 0
+            ? "Select a ship and click its starting cell. Ships cannot touch."
+            : "Last placement undone. Select another ship to continue.";
+    }
+
+    private void RefreshPlacementBoard()
+    {
+        if (_placementBoardState is null)
+        {
+            return;
+        }
+
+        _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, _placementBoardState, OnPlacementCellClicked);
+        foreach (var placement in _shipPlacements)
+        {
+            _placementBoard.ApplyShipPlacement(placement);
+        }
+
+        PlacementGrid.Children.Clear();
+        PlacementGrid.Children.Add(_placementBoard);
     }
 
     private void BuildGrids(CellState[] board)
@@ -218,6 +294,7 @@ public partial class MainWindow : Window, IGameEventObserver
         {
             1 => _controlsPanel.LineOrientationSelectedIndex == 1 ? _verticalLineShotStrategy : _horizontalLineShotStrategy,
             2 => _spreadShotStrategy,
+            3 => _ringShotStrategy,
             _ => _singleShotStrategy
         };
     }
