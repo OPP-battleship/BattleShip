@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BattleShip.Client.Observers;
 using Microsoft.AspNetCore.SignalR.Client;
 using BattleShip.Shared;
 namespace BattleShip.Client;
@@ -9,12 +10,33 @@ namespace BattleShip.Client;
 public class ConnectionService
 {
     private HubConnection? _connection;
+    private readonly List<IGameEventObserver> _observers = [];
+    private readonly object _observersLock = new();
+
     public string? MyConnectionId => _connection?.ConnectionId;
 
-    public event Action<PlacementStartedMessage>? PlacementStarted;
-    public event Action<GameStartedMessage>? GameStarted;
-    public event Action<ShotResultMessage>? ShotResultReceived;
-    public event Action<OpponentDisconnectedMessage>? OpponentDisconnected;
+    public void Subscribe(IGameEventObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+
+        lock (_observersLock)
+        {
+            if (!_observers.Contains(observer))
+            {
+                _observers.Add(observer);
+            }
+        }
+    }
+
+    public void Unsubscribe(IGameEventObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+
+        lock (_observersLock)
+        {
+            _observers.Remove(observer);
+        }
+    }
     
     public async Task ConnectAsync(string serverUrl)
     {
@@ -23,10 +45,14 @@ public class ConnectionService
             .WithAutomaticReconnect()
             .Build();
 
-        _connection.On<PlacementStartedMessage>("PlacementStarted", msg => PlacementStarted?.Invoke(msg));
-        _connection.On<GameStartedMessage>("GameStarted", msg => GameStarted?.Invoke(msg));
-        _connection.On<ShotResultMessage>("ShotResult", msg => ShotResultReceived?.Invoke(msg));
-        _connection.On<OpponentDisconnectedMessage>("OpponentDisconnected", msg => OpponentDisconnected?.Invoke(msg));
+        _connection.On<PlacementStartedMessage>("PlacementStarted", message =>
+            Notify(observer => observer.OnPlacementStarted(message)));
+        _connection.On<GameStartedMessage>("GameStarted", message =>
+            Notify(observer => observer.OnGameStarted(message)));
+        _connection.On<ShotResultMessage>("ShotResult", message =>
+            Notify(observer => observer.OnShotResult(message)));
+        _connection.On<OpponentDisconnectedMessage>("OpponentDisconnected", message =>
+            Notify(observer => observer.OnOpponentDisconnected(message)));
 
         await _connection.StartAsync();
     }
@@ -47,5 +73,20 @@ public class ConnectionService
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
         return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
+    }
+
+    private void Notify(Action<IGameEventObserver> notification)
+    {
+        IGameEventObserver[] observers;
+
+        lock (_observersLock)
+        {
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            notification(observer);
+        }
     }
 }

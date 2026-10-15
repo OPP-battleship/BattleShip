@@ -1,17 +1,18 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using BattleShip.Client.Observers;
 using BattleShip.Shared;
 
 namespace BattleShip.Client.Views;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IGameEventObserver
 {
     private const string ServerUrl = "http://localhost:5058";
 
     private readonly ConnectionService _connection = new();
+    private readonly IGameEventObserver _gameEventObserver;
     private readonly ControlsPanel _controlsPanel;
     private readonly ShipPanel _shipPanel;
     private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
@@ -41,10 +42,11 @@ public partial class MainWindow : Window
         _shipPanel.ReadyRequested += OnReadyRequested;
         ShipSelectionGrid.Children.Add(_shipPanel);
 
-        _connection.PlacementStarted += OnPlacementStarted;
-        _connection.GameStarted += OnGameStarted;
-        _connection.ShotResultReceived += OnShotResultReceived;
-        _connection.OpponentDisconnected += OnOpponentDisconnected;
+        _gameEventObserver = new UiThreadGameEventObserverDecorator(
+            new ExceptionHandlingGameEventObserverDecorator(
+                new LoggingGameEventObserverDecorator(this)));
+        _connection.Subscribe(_gameEventObserver);
+        Closed += (_, _) => _connection.Unsubscribe(_gameEventObserver);
     }
 
     private async void OnFindMatchClicked(object? sender, RoutedEventArgs e)
@@ -67,83 +69,71 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPlacementStarted(PlacementStartedMessage msg)
+    public void OnPlacementStarted(PlacementStartedMessage msg)
     {
-        Dispatcher.UIThread.Post(() =>
+        _sessionId = msg.SessionId;
+        _placementBlockedCells.Clear();
+        for (int y = 0; y < GridModel.Size; y++)
         {
-            _sessionId = msg.SessionId;
-            _placementBlockedCells.Clear();
-            for (int y = 0; y < GridModel.Size; y++)
+            for (int x = 0; x < GridModel.Size; x++)
             {
-                for (int x = 0; x < GridModel.Size; x++)
+                if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
                 {
-                    if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
-                    {
-                        _placementBlockedCells.Add((x, y));
-                    }
+                    _placementBlockedCells.Add((x, y));
                 }
             }
+        }
 
-            _shipPlacements.Clear();
-            _shipPanel.Reset();
-            _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked);
-            PlacementGrid.Children.Clear();
-            PlacementGrid.Children.Add(_placementBoard);
+        _shipPlacements.Clear();
+        _shipPanel.Reset();
+        _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, msg.Board, OnPlacementCellClicked);
+        PlacementGrid.Children.Clear();
+        PlacementGrid.Children.Add(_placementBoard);
 
-            MenuPanel.IsVisible = false;
-            GamePanel.IsVisible = false;
-            PlacementPanel.IsVisible = true;
-            PlacementStatusText.Text = "Select a ship and click its starting cell. Ships cannot touch.";
-        });
+        MenuPanel.IsVisible = false;
+        GamePanel.IsVisible = false;
+        PlacementPanel.IsVisible = true;
+        PlacementStatusText.Text = "Select a ship and click its starting cell. Ships cannot touch.";
     }
 
-    private void OnGameStarted(GameStartedMessage msg)
+    public void OnGameStarted(GameStartedMessage msg)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isMyTurn = msg.YouGoFirst;
-            BuildGrids(msg.YourBoard);
-            BuildScoreboard();
-            PlacementPanel.IsVisible = false;
-            GamePanel.IsVisible = true;
-            UpdateTurnText();
-        });
+        _isMyTurn = msg.YouGoFirst;
+        BuildGrids(msg.YourBoard);
+        BuildScoreboard();
+        PlacementPanel.IsVisible = false;
+        GamePanel.IsVisible = true;
+        UpdateTurnText();
     }
 
-    private void OnShotResultReceived(ShotResultMessage msg)
+    public void OnShotResult(ShotResultMessage msg)
     {
-        Dispatcher.UIThread.Post(() =>
+        bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
+
+        var target = iShotThis ? _enemyBoard : _yourBoard;
+        target?.ApplyShot(msg.X, msg.Y, msg.IsHit, msg.IsObstacle);
+
+        if (msg.IsHit)
         {
-            bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
+            _scoreboard?.AddPoint(isYou: iShotThis);
+        }
 
-            var target = iShotThis ? _enemyBoard : _yourBoard;
-            target?.ApplyShot(msg.X, msg.Y, msg.IsHit, msg.IsObstacle);
-
-            if (msg.IsHit)
-            {
-                _scoreboard?.AddPoint(isYou: iShotThis);
-            }
-
-            _isMyTurn = msg.IsYourTurnNext;
-            UpdateTurnText();
-        });
+        _isMyTurn = msg.IsYourTurnNext;
+        UpdateTurnText();
     }
 
-    private void OnOpponentDisconnected(OpponentDisconnectedMessage msg)
+    public void OnOpponentDisconnected(OpponentDisconnectedMessage msg)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            StatusText.Text = "Opponent disconnected.";
-            PlacementPanel.IsVisible = false;
-            GamePanel.IsVisible = false;
-            MenuPanel.IsVisible = true;
-            FindMatchButton.IsEnabled = true;
-            _sessionId = null;
-            _shipPlacements.Clear();
-            _placementBlockedCells.Clear();
-            _placementBoard = null;
-            _shipPanel.Reset();
-        });
+        StatusText.Text = "Opponent disconnected.";
+        PlacementPanel.IsVisible = false;
+        GamePanel.IsVisible = false;
+        MenuPanel.IsVisible = true;
+        FindMatchButton.IsEnabled = true;
+        _sessionId = null;
+        _shipPlacements.Clear();
+        _placementBlockedCells.Clear();
+        _placementBoard = null;
+        _shipPanel.Reset();
     }
 
     private void OnPlacementCellClicked(int x, int y)
