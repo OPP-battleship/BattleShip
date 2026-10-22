@@ -16,6 +16,9 @@ public sealed class UiThreadGameEventObserverDecorator(IGameEventObserver inner)
     public override void OnGameStarted(GameStartedMessage message) =>
         Dispatch(() => base.OnGameStarted(message));
 
+    public override void OnGameResumed(GameResumedMessage message) =>
+        Dispatch(() => base.OnGameResumed(message));
+
     public override void OnShotResult(ShotResultMessage message) =>
         Dispatch(() => base.OnShotResult(message));
 

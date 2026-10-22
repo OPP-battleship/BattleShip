@@ -31,9 +31,15 @@ public sealed class LoggingGameEventObserverDecorator : GameEventObserverDecorat
         base.OnGameStarted(message);
     }
 
+    public override void OnGameResumed(GameResumedMessage message)
+    {
+        Write($"Game resumed for session {message.SessionId}; your turn: {message.IsYourTurn}.");
+        base.OnGameResumed(message);
+    }
+
     public override void OnShotResult(ShotResultMessage message)
     {
-        Write($"Shot result at ({message.X}, {message.Y}); hit: {message.IsHit}; obstacle: {message.IsObstacle}.");
+        Write($"Shot result at {message.X},{message.Y}; hit: {message.IsHit}; obstacle: {message.IsObstacle}.");
         base.OnShotResult(message);
     }
 

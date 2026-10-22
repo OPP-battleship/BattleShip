@@ -8,6 +8,8 @@ namespace BattleShip.Client;
 
 public partial class App : Application
 {
+    public static bool IsDebugMode { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);

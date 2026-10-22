@@ -42,6 +42,8 @@
                                 <Panel Name="EnemyGrid"/>
                                 <Panel Name="ControlsGrid"/>
                                 <TextBlock Name="TurnText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
+                                <Button Name="SaveGameButton" Content="Save Game" Click="OnSaveGameClicked" HorizontalAlignment="Center"/>
+                                <TextBlock Name="SaveStatusText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
                         </StackPanel>
                 </Grid>
         </Grid>

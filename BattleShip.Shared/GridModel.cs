@@ -1,10 +1,53 @@
 ﻿namespace BattleShip.Shared;
 
-public class GridModel
+public class GridModel : IPrototype<GridModel>
 {
     public const int Size = 10;
 
     private readonly CellState[,] _cells = new CellState[Size, Size];
+    private readonly byte[,] _shots = new byte[Size, Size];
+
+    private const byte ShotMiss = 1;
+    private const byte ShotHit = 2;
+    private const byte ShotObstacle = 3;
+    private const byte ShotMissOnPowerUp = 4;
+
+    private GridModel(GridModel source)
+    {
+        Array.Copy(source._cells, _cells, source._cells.Length);
+        Array.Copy(source._shots, _shots, source._shots.Length);
+    }
+
+    public GridModel Clone() => new(this);
+
+    public static GridModel FromFlatArray(IReadOnlyList<CellState> cells, IReadOnlyList<int>? shotCodes = null)
+    {
+        ArgumentNullException.ThrowIfNull(cells);
+        if (cells.Count != Size * Size)
+        {
+            throw new ArgumentException($"Expected {Size * Size} cells.", nameof(cells));
+        }
+
+        if (shotCodes is not null && shotCodes.Count != Size * Size)
+        {
+            throw new ArgumentException($"Expected {Size * Size} shot codes.", nameof(shotCodes));
+        }
+
+        var grid = new GridModel();
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                grid._cells[x, y] = cells[y * Size + x];
+                if (shotCodes is not null)
+                {
+                    grid._shots[x, y] = (byte)shotCodes[y * Size + x];
+                }
+            }
+        }
+
+        return grid;
+    }
 
     public GridModel() : this(Array.Empty<Obstacle>(), Array.Empty<PowerUp>())
     {
@@ -153,8 +196,69 @@ public class GridModel
 
     public bool TryMarkFired(int x, int y)
     {
-        if (_cells[x, y] == CellState.Fired) return false;
+        var previous = _cells[x, y];
+        if (previous == CellState.Fired) return false;
+        _shots[x, y] = previous switch
+        {
+            CellState.Ship => ShotHit,
+            CellState.Obstacle => ShotObstacle,
+            CellState.PowerUp => ShotMissOnPowerUp,
+            _ => ShotMiss
+        };
         _cells[x, y] = CellState.Fired;
         return true;
+    }
+
+    public int[] ToShotCodes()
+    {
+        var codes = new int[Size * Size];
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                codes[y * Size + x] = _shots[x, y];
+            }
+        }
+
+        return codes;
+    }
+
+    public IReadOnlyList<ShotMark> GetShotMarks()
+    {
+        var marks = new List<ShotMark>();
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                var code = _shots[x, y];
+                if (code != 0)
+                {
+                    marks.Add(new ShotMark(x, y, code == ShotHit, code == ShotObstacle));
+                }
+            }
+        }
+
+        return marks;
+    }
+
+    public CellState[] ToUnfiredFlatArray()
+    {
+        var cells = ToFlatArray();
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                if (cells[y * Size + x] != CellState.Fired) continue;
+                cells[y * Size + x] = _shots[x, y] switch
+                {
+                    ShotHit => CellState.Ship,
+                    ShotObstacle => CellState.Obstacle,
+                    ShotMissOnPowerUp => CellState.PowerUp,
+                    _ => CellState.Empty
+                };
+            }
+        }
+
+        return cells;
     }
 }

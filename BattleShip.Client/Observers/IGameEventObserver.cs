@@ -11,6 +11,8 @@ public interface IGameEventObserver
 
     void OnGameStarted(GameStartedMessage message);
 
+    void OnGameResumed(GameResumedMessage message);
+
     void OnShotResult(ShotResultMessage message);
 
     void OnOpponentDisconnected(OpponentDisconnectedMessage message);

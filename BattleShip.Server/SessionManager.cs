@@ -6,12 +6,16 @@ namespace BattleShip.Server;
 public sealed class SessionManager
 {
     private static readonly SessionManager _instance = new SessionManager();
+    private const string DebugPrototypeKey = "debug";
 
     private readonly ConcurrentQueue<string> WaitingQueue = new();
     private readonly ConcurrentDictionary<string, GameSession> SessionsByConnection = new();
     private readonly HashSet<string> WaitingConnectionIds = [];
     private readonly HashSet<string> ConnectedConnectionIds = [];
     private readonly object _matchmakingLock = new();
+    private string? _pendingDebugConnectionId;
+
+    public SessionPrototypeRegistry Prototypes { get; } = new();
 
     private SessionManager()
     {
@@ -72,6 +76,38 @@ public sealed class SessionManager
         }
     }
 
+    public GameSession? TryStartDebugSession(string connectionId, GameSessionSnapshot snapshot)
+    {
+        lock (_matchmakingLock)
+        {
+            if (SessionsByConnection.ContainsKey(connectionId))
+            {
+                return null;
+            }
+
+            if (_pendingDebugConnectionId is null ||
+                _pendingDebugConnectionId == connectionId ||
+                !ConnectedConnectionIds.Contains(_pendingDebugConnectionId))
+            {
+                _pendingDebugConnectionId = connectionId;
+                return null;
+            }
+
+            var playerA = _pendingDebugConnectionId;
+            _pendingDebugConnectionId = null;
+
+            Prototypes.Register(DebugPrototypeKey, GameSession.FromSnapshot(snapshot, playerA, connectionId));
+            if (!Prototypes.TrySpawn(DebugPrototypeKey, out var session) || session is null)
+            {
+                return null;
+            }
+
+            SessionsByConnection[playerA] = session;
+            SessionsByConnection[connectionId] = session;
+            return session;
+        }
+    }
+
     public bool TryGetSession(string connectionId, out GameSession? session) =>
         SessionsByConnection.TryGetValue(connectionId, out session);
 
@@ -82,8 +118,12 @@ public sealed class SessionManager
             ConnectedConnectionIds.Remove(connectionId);
             WaitingConnectionIds.Remove(connectionId);
 
-            if (!SessionsByConnection.TryRemove(connectionId, out session))
+            if (_pendingDebugConnectionId == connectionId)
             {
+                _pendingDebugConnectionId = null;
+            }
+
+            if (!SessionsByConnection.TryRemove(connectionId, out session))            {
                 return false;
             }
 
