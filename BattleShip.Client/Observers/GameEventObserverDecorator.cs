@@ -16,6 +16,9 @@ public abstract class GameEventObserverDecorator(IGameEventObserver inner) : IGa
     public virtual void OnGameStarted(GameStartedMessage message) =>
         Inner.OnGameStarted(message);
 
+    public virtual void OnGameResumed(GameResumedMessage message) =>
+        Inner.OnGameResumed(message);
+
     public virtual void OnShotResult(ShotResultMessage message) =>
         Inner.OnShotResult(message);
 

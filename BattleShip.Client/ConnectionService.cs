@@ -41,7 +41,7 @@ public class ConnectionService
     public async Task ConnectAsync(string serverUrl)
     {
         _connection = new HubConnectionBuilder()
-            .WithUrl($"{serverUrl}/gamehub")
+            .WithUrl(App.IsDebugMode ? $"{serverUrl}/gamehub?debug=true" : $"{serverUrl}/gamehub")
             .WithAutomaticReconnect()
             .Build();
 
@@ -49,6 +49,8 @@ public class ConnectionService
             Notify(observer => observer.OnPlacementStarted(message)));
         _connection.On<GameStartedMessage>("GameStarted", message =>
             Notify(observer => observer.OnGameStarted(message)));
+        _connection.On<GameResumedMessage>("GameResumed", message =>
+            Notify(observer => observer.OnGameResumed(message)));
         _connection.On<ShotResultMessage>("ShotResult", message =>
             Notify(observer => observer.OnShotResult(message)));
         _connection.On<OpponentDisconnectedMessage>("OpponentDisconnected", message =>
@@ -73,6 +75,12 @@ public class ConnectionService
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
         return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
+    }
+
+    public Task<string> SaveGameAsync()
+    {
+        if (_connection is null) throw new InvalidOperationException("Not connected yet.");
+        return _connection.InvokeAsync<string>("SaveGame");
     }
 
     private void Notify(Action<IGameEventObserver> notification)

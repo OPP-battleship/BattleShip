@@ -111,6 +111,38 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         UpdateTurnText();
     }
 
+    public void OnGameResumed(GameResumedMessage msg)
+    {
+        _sessionId = msg.SessionId;
+        _myConnectionId = _connection.MyConnectionId;
+        _isMyTurn = msg.IsYourTurn;
+        BuildGrids(msg.YourBoard);
+        BuildScoreboard();
+
+        foreach (var shot in msg.ShotsAtYou)
+        {
+            _yourBoard?.ApplyShot(shot.X, shot.Y, shot.IsHit, shot.IsObstacle);
+            if (shot.IsHit)
+            {
+                _scoreboard?.AddPoint(isYou: false);
+            }
+        }
+
+        foreach (var shot in msg.ShotsByYou)
+        {
+            _enemyBoard?.ApplyShot(shot.X, shot.Y, shot.IsHit, shot.IsObstacle);
+            if (shot.IsHit)
+            {
+                _scoreboard?.AddPoint(isYou: true);
+            }
+        }
+
+        MenuPanel.IsVisible = false;
+        PlacementPanel.IsVisible = false;
+        GamePanel.IsVisible = true;
+        UpdateTurnText();
+    }
+
     public void OnShotResult(ShotResultMessage msg)
     {
         bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
@@ -297,6 +329,24 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             3 => _ringShotStrategy,
             _ => _singleShotStrategy
         };
+    }
+
+    private async void OnSaveGameClicked(object? sender, RoutedEventArgs e)
+    {
+        SaveGameButton.IsEnabled = false;
+        try
+        {
+            var fileName = await _connection.SaveGameAsync();
+            SaveStatusText.Text = $"Game saved to saves/{fileName}";
+        }
+        catch (Exception ex)
+        {
+            SaveStatusText.Text = $"Failed to save game: {ex.Message}";
+        }
+        finally
+        {
+            SaveGameButton.IsEnabled = true;
+        }
     }
 
     private void UpdateTurnText()

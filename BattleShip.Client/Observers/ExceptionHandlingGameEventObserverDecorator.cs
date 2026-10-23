@@ -26,6 +26,9 @@ public sealed class ExceptionHandlingGameEventObserverDecorator : GameEventObser
     public override void OnGameStarted(GameStartedMessage message) =>
         Execute(nameof(OnGameStarted), () => base.OnGameStarted(message));
 
+    public override void OnGameResumed(GameResumedMessage message) =>
+        Execute(nameof(OnGameResumed), () => base.OnGameResumed(message));
+
     public override void OnShotResult(ShotResultMessage message) =>
         Execute(nameof(OnShotResult), () => base.OnShotResult(message));
 

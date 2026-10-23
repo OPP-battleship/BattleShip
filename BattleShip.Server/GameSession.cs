@@ -2,7 +2,7 @@
 
 namespace BattleShip.Server;
 
-public class GameSession
+public class GameSession : IPrototype<GameSession>
 {
     public string SessionId { get; } = Guid.NewGuid().ToString();
     public string PlayerAConnectionId { get; }
@@ -30,6 +30,71 @@ public class GameSession
             levelFactory.GetPowerUps(BoardLayout.PlayerB));
         CurrentTurnConnectionId = playerA; // player A always go first
     }
+
+    private GameSession(GameSession source)
+    {
+        lock (source._lock)
+        {
+            SessionId = source.SessionId;
+            PlayerAConnectionId = source.PlayerAConnectionId;
+            PlayerBConnectionId = source.PlayerBConnectionId;
+            GridA = source.GridA.Clone();
+            GridB = source.GridB.Clone();
+            CurrentTurnConnectionId = source.CurrentTurnConnectionId;
+            _playerAReady = source._playerAReady;
+            _playerBReady = source._playerBReady;
+            _isGameStarted = source._isGameStarted;
+        }
+    }
+
+    private GameSession(GameSessionSnapshot snapshot, string playerA, string playerB)
+    {
+        SessionId = snapshot.SessionId;
+        PlayerAConnectionId = playerA;
+        PlayerBConnectionId = playerB;
+        GridA = GridModel.FromFlatArray(snapshot.GridA.Select(c => (CellState)c).ToArray(), snapshot.ShotsA.Length == 0 ? null : snapshot.ShotsA);
+        GridB = GridModel.FromFlatArray(snapshot.GridB.Select(c => (CellState)c).ToArray(), snapshot.ShotsB.Length == 0 ? null : snapshot.ShotsB);
+        CurrentTurnConnectionId = snapshot.IsPlayerATurn ? playerA : playerB;
+        _playerAReady = snapshot.PlayerAReady;
+        _playerBReady = snapshot.PlayerBReady;
+        _isGameStarted = snapshot.IsGameStarted;
+    }
+
+    public GameSession Clone() => new(this);
+
+    public bool IsGameStarted
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _isGameStarted;
+            }
+        }
+    }
+
+    public GameSessionSnapshot ToSnapshot()
+    {
+        lock (_lock)
+        {
+            return new GameSessionSnapshot
+            {
+                SessionId = SessionId,
+                GridA = GridA.ToFlatArray().Select(c => (int)c).ToArray(),
+                GridB = GridB.ToFlatArray().Select(c => (int)c).ToArray(),
+                ShotsA = GridA.ToShotCodes(),
+                ShotsB = GridB.ToShotCodes(),
+                IsPlayerATurn = CurrentTurnConnectionId == PlayerAConnectionId,
+                PlayerAReady = _playerAReady,
+                PlayerBReady = _playerBReady,
+                IsGameStarted = _isGameStarted,
+                Timestamp = DateTime.UtcNow
+            };
+        }
+    }
+
+    public static GameSession FromSnapshot(GameSessionSnapshot snapshot, string playerA, string playerB) =>
+        new(snapshot, playerA, playerB);
 
     public string OpponentOf(string connectionId) =>
         connectionId == PlayerAConnectionId ? PlayerBConnectionId : PlayerAConnectionId;
@@ -122,6 +187,35 @@ public class GameSession
             }
 
             return true;
+        }
+    }
+
+    internal GameResumedMessage? CreateGameResumedMessage(string connectionId)
+    {
+        lock (_lock)
+        {
+            if (!_isGameStarted || (connectionId != PlayerAConnectionId && connectionId != PlayerBConnectionId))
+            {
+                return null;
+            }
+
+            var ownGrid = GridOf(connectionId);
+            var enemyGrid = GridOf(OpponentOf(connectionId));
+
+            return new GameResumedMessage(
+                SessionId,
+                IsYourTurn: connectionId == CurrentTurnConnectionId,
+                ownGrid.ToUnfiredFlatArray(),
+                ownGrid.GetShotMarks().ToArray(),
+                enemyGrid.GetShotMarks().ToArray());
+        }
+    }
+
+    internal PlacementStartedMessage CreatePlacementStartedMessage(string connectionId)
+    {
+        lock (_lock)
+        {
+            return new PlacementStartedMessage(SessionId, GridOf(connectionId).ToFlatArray());
         }
     }
 

@@ -64,3 +64,5 @@ appsettings.*.local.json
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+saves/

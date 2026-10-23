@@ -14,6 +14,12 @@ public class GameHub : Hub
 
     public async Task FindMatch()
     {
+        if (IsDebugConnection)
+        {
+            await StartDebugSessionAsync();
+            return;
+        }
+
         var session = SessionManager.Instance.TryMatch(Context.ConnectionId);
         if (session is null)
         {
@@ -34,6 +40,51 @@ public class GameHub : Hub
             .SendAsync("PlacementStarted", new PlacementStartedMessage(
                 session.SessionId,
                 session.GridB.ToFlatArray()));
+    }
+
+    private bool IsDebugConnection =>
+        string.Equals(Context.GetHttpContext()?.Request.Query["debug"], "true", StringComparison.OrdinalIgnoreCase);
+
+    private async Task StartDebugSessionAsync()
+    {
+        var snapshot = await GameSnapshotStore.LoadLatestAsync();
+        if (snapshot is null)
+        {
+            throw new HubException("No saved game found in the saves folder.");
+        }
+
+        var session = SessionManager.Instance.TryStartDebugSession(Context.ConnectionId, snapshot);
+        if (session is null)
+        {
+            return; // waiting for the second debug client
+        }
+
+        foreach (var playerId in new[] { session.PlayerAConnectionId, session.PlayerBConnectionId })
+        {
+            await Groups.AddToGroupAsync(playerId, session.SessionId);
+
+            var resumed = session.CreateGameResumedMessage(playerId);
+            if (resumed is not null)
+            {
+                await Clients.Client(playerId).SendAsync("GameResumed", resumed);
+            }
+            else
+            {
+                await Clients.Client(playerId).SendAsync("PlacementStarted", session.CreatePlacementStartedMessage(playerId));
+            }
+        }
+    }
+
+    public async Task<string> SaveGame()
+    {
+        if (!SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) || session is null)
+        {
+            throw new HubException("No active game to save.");
+        }
+
+        var prototype = session.Clone();
+        SessionManager.Instance.Prototypes.Register("saved", prototype);
+        return await GameSnapshotStore.SaveAsync(prototype.ToSnapshot());
     }
 
     public async Task SubmitShipPlacement(SubmitShipPlacementRequest request)
