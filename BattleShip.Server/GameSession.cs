@@ -102,7 +102,7 @@ public class GameSession : IPrototype<GameSession>
     private GridModel GridOf(string connectionId) =>
         connectionId == PlayerAConnectionId ? GridA : GridB;
 
-    internal bool TryFireShotPattern(string shooterConnectionId, IReadOnlyList<ShotTarget> targets, out IReadOnlyList<ShotOutcome> outcomes)
+    internal bool TryFireShotPattern(string shooterConnectionId, FireShotRequest request, out IReadOnlyList<ShotOutcome> outcomes)
     {
         outcomes = [];
         var results = new List<ShotOutcome>();
@@ -111,6 +111,22 @@ public class GameSession : IPrototype<GameSession>
         {
             if (!_isGameStarted) return false;
             if (shooterConnectionId != CurrentTurnConnectionId) return false;
+            if (request is null ||
+                !Enum.IsDefined(request.Strategy) ||
+                !Enum.IsDefined(request.LineOrientation) ||
+                !GridModel.IsInsideBounds(request.OriginX, request.OriginY))
+            {
+                return false;
+            }
+
+            var shooterGrid = GridOf(shooterConnectionId);
+            if (!shooterGrid.GetAvailableShotStrategies().Contains(request.Strategy))
+            {
+                return false;
+            }
+
+            var targets = ShotStrategyFactory.Create(request.Strategy, request.LineOrientation)
+                .GetTargets(request.OriginX, request.OriginY);
             if (targets.Count == 0) return false;
 
             var defenderId = OpponentOf(shooterConnectionId);
@@ -231,7 +247,16 @@ public class GameSession : IPrototype<GameSession>
             return new GameStartedMessage(
                 SessionId,
                 YouGoFirst: connectionId == PlayerAConnectionId,
-                GridOf(connectionId).ToFlatArray());
+                GridOf(connectionId).ToFlatArray(),
+                GridOf(connectionId).GetAvailableShotStrategies().ToArray());
+        }
+    }
+
+    internal IReadOnlyList<ShotStrategyType> GetAvailableShotStrategies(string connectionId)
+    {
+        lock (_lock)
+        {
+            return GridOf(connectionId).GetAvailableShotStrategies();
         }
     }
 }

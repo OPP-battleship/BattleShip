@@ -15,11 +15,6 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private readonly IGameEventObserver _gameEventObserver;
     private readonly ControlsPanel _controlsPanel;
     private readonly ShipPanel _shipPanel;
-    private readonly IShotStrategy _singleShotStrategy = new SingleShotStrategy();
-    private readonly IShotStrategy _horizontalLineShotStrategy = new LineShotStrategy(ShotOrientation.Horizontal);
-    private readonly IShotStrategy _verticalLineShotStrategy = new LineShotStrategy(ShotOrientation.Vertical);
-    private readonly IShotStrategy _spreadShotStrategy = new SpreadShotStrategy();
-    private readonly IShotStrategy _ringShotStrategy = new RingShotStrategy();
 
     private BoardPanel? _yourBoard;
     private BoardPanel? _enemyBoard;
@@ -98,12 +93,13 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         MenuPanel.IsVisible = false;
         GamePanel.IsVisible = false;
         PlacementPanel.IsVisible = true;
-        PlacementStatusText.Text = "Select a ship and click its starting cell. Ships cannot touch.";
+        PlacementStatusText.Text = $"Select ships and click their starting cell. Spend all {ShipCatalogue.PointBudget} points. Ships cannot touch.";
     }
 
     public void OnGameStarted(GameStartedMessage msg)
     {
         _isMyTurn = msg.YouGoFirst;
+        _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         BuildGrids(msg.YourBoard);
         BuildScoreboard();
         PlacementPanel.IsVisible = false;
@@ -145,6 +141,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     public void OnShotResult(ShotResultMessage msg)
     {
+        _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
 
         var target = iShotThis ? _enemyBoard : _yourBoard;
@@ -183,8 +180,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             return;
         }
 
-        int length = _shipPanel.SelectedLength;
-        var placement = new ShipPlacement(x, y, length, _shipPanel.SelectedOrientation);
+        var placement = new ShipPlacement(x, y, _shipPanel.SelectedShipType, _shipPanel.SelectedOrientation);
         var command = new PlaceShipCommand(this, placement);
 
         if (!_placementCommands.TryExecute(command, out var failureMessage))
@@ -239,6 +235,12 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         }
 
         var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
+        if (ShipPlacementRules.GetSpentPoints(tentativePlacements) > ShipCatalogue.PointBudget)
+        {
+            failureMessage = "That ship costs more points than you have remaining.";
+            return false;
+        }
+
         var candidateGrid = new GridModel(_placementBlockedCells);
 
         if (!candidateGrid.TryPlaceShips(tentativePlacements))
@@ -254,10 +256,10 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     {
         _shipPlacements.Add(placement);
         RefreshPlacementBoard();
-        _shipPanel.MarkShipPlaced(placement.Length);
+        _shipPanel.MarkShipPlaced(placement.Type);
         PlacementStatusText.Text = _shipPanel.HasCompleteFleet
-            ? "Fleet complete. Select Ready to start when your opponent is ready."
-            : $"Placed length-{placement.Length} ship. Select another ship to continue.";
+            ? "All points spent. Select Ready to start when your opponent is ready."
+            : $"Placed {ShipCatalogue.GetDisplayName(placement.Type)}. {_shipPanel.PointsRemaining} points remaining.";
     }
 
     public void RevertPlacement(ShipPlacement placement)
@@ -268,9 +270,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         }
 
         RefreshPlacementBoard();
-        _shipPanel.MarkShipRemoved(placement.Length);
+        _shipPanel.MarkShipRemoved(placement.Type);
         PlacementStatusText.Text = _shipPlacements.Count == 0
-            ? "Select a ship and click its starting cell. Ships cannot touch."
+            ? $"Select ships and spend all {ShipCatalogue.PointBudget} points. Ships cannot touch."
             : "Last placement undone. Select another ship to continue.";
     }
 
@@ -316,19 +318,10 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     {
         if (!_isMyTurn) return;
 
-        var shotStrategy = GetSelectedShotStrategy();
-        await _connection.FireShotAsync(shotStrategy.GetTargets(x, y));
-    }
-
-    private IShotStrategy GetSelectedShotStrategy()
-    {
-        return _controlsPanel.ShotModeSelectedIndex switch
-        {
-            1 => _controlsPanel.LineOrientationSelectedIndex == 1 ? _verticalLineShotStrategy : _horizontalLineShotStrategy,
-            2 => _spreadShotStrategy,
-            3 => _ringShotStrategy,
-            _ => _singleShotStrategy
-        };
+        var lineOrientation = _controlsPanel.LineOrientationSelectedIndex == 1
+            ? ShotOrientation.Vertical
+            : ShotOrientation.Horizontal;
+        await _connection.FireShotAsync(_controlsPanel.SelectedShotStrategy, x, y, lineOrientation);
     }
 
     private async void OnSaveGameClicked(object? sender, RoutedEventArgs e)
