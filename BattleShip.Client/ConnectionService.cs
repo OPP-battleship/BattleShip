@@ -37,7 +37,7 @@ public class ConnectionService
             _observers.Remove(observer);
         }
     }
-    
+
     public async Task ConnectAsync(string serverUrl)
     {
         _connection = new HubConnectionBuilder()
@@ -58,7 +58,7 @@ public class ConnectionService
 
         await _connection.StartAsync();
     }
-    
+
     public Task FindMatchAsync()
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
@@ -80,7 +80,7 @@ public class ConnectionService
     public Task<string> SaveGameAsync()
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
-        return _connection.InvokeAsync<string>("SaveGame");
+        return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
     }
 
     private void Notify(Action<IGameEventObserver> notification)

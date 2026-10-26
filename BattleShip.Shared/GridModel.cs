@@ -215,7 +215,18 @@ public class GridModel : IPrototype<GridModel>
     public bool TryMarkFired(int x, int y)
     {
         if (_cells[x, y] == CellState.Fired) return false;
+        if (_cells[x, y] == CellState.Ship && _shipOwners[x, y] >= 0)
+        {
+            _placedShips[_shipOwners[x, y]].RemainingCells--;
+        }
+
         _cells[x, y] = CellState.Fired;
         return true;
+    }
+
+    private sealed class PlacedShip(Ship ship, IReadOnlyList<GridPosition> occupiedCells)
+    {
+        public Ship Ship { get; } = ship;
+        public int RemainingCells { get; set; } = occupiedCells.Count;
     }
 }
