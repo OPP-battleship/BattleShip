@@ -2,36 +2,35 @@ namespace BattleShip.Shared;
 
 public static class ShipPlacementRules
 {
-    public static bool HasCompleteFleet(IReadOnlyList<ShipPlacement>? placements)
+    public static int GetSpentPoints(IReadOnlyList<ShipPlacement>? placements)
     {
-        if (placements is null || placements.Count != 10)
+        if (placements is null)
         {
-            return false;
+            return 0;
         }
 
-        int lengthFourCount = 0;
-        int lengthThreeCount = 0;
-        int lengthTwoCount = 0;
-        int lengthOneCount = 0;
+        int points = 0;
 
         foreach (var placement in placements)
         {
-            if (placement is null)
+            if (placement is null || !Enum.IsDefined(placement.Type))
             {
-                return false;
+                return -1;
             }
 
-            switch (placement.Length)
+            try
             {
-                case 4: lengthFourCount++; break;
-                case 3: lengthThreeCount++; break;
-                case 2: lengthTwoCount++; break;
-                case 1: lengthOneCount++; break;
-                default: return false;
+                points += ShipCatalogue.Create(placement.Type).PointCost;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return -1;
             }
         }
 
-        return lengthFourCount == 1 && lengthThreeCount == 2 &&
-               lengthTwoCount == 3 && lengthOneCount == 4;
+        return points;
     }
+
+    public static bool HasCompleteFleet(IReadOnlyList<ShipPlacement>? placements) =>
+        GetSpentPoints(placements) == ShipCatalogue.PointBudget;
 }

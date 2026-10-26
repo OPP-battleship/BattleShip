@@ -6,4 +6,4 @@ public enum ShipOrientation
     Vertical,
 }
 
-public sealed record ShipPlacement(int X, int Y, int Length, ShipOrientation Orientation);
+public sealed record ShipPlacement(int X, int Y, ShipType Type, ShipOrientation Orientation);

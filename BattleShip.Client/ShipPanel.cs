@@ -10,65 +10,68 @@ namespace BattleShip.Client;
 
 internal sealed class ShipPanel : Panel
 {
-    private readonly Dictionary<int, Button> _shipButtons;
-    private readonly Dictionary<int, int> _remainingShips = new()
-    {
-        [4] = 1,
-        [3] = 2,
-        [2] = 3,
-        [1] = 4,
-    };
+    private readonly Dictionary<ShipType, Button> _shipButtons;
     private readonly ComboBox _shipOrientationComboBox;
     private readonly Button _readyButton;
     private readonly Button _undoButton;
+    private readonly TextBlock _pointsText;
+    private readonly Dictionary<ShipType, int> _shipCounts = [];
     private bool _undoEnabled;
     private bool _isReady;
 
     public event Action? ReadyRequested;
     public event Action? UndoRequested;
 
-    internal ShipPanel(Avalonia.Controls.Panel layout, Dictionary<int, Button> shipButtons,
-        ComboBox orientationComboBox, Button readyButton, Button undoButton)
+    internal ShipPanel(Avalonia.Controls.Panel layout, Dictionary<ShipType, Button> shipButtons,
+        ComboBox orientationComboBox, Button readyButton, Button undoButton, TextBlock pointsText)
         : base(layout)
     {
         _shipButtons = shipButtons;
         _shipOrientationComboBox = orientationComboBox;
         _readyButton = readyButton;
         _undoButton = undoButton;
+        _pointsText = pointsText;
 
-        foreach (var (length, button) in _shipButtons)
+        foreach (var (type, button) in _shipButtons)
         {
             button.Click += (_, _) =>
             {
-                SelectedLength = length;
+                SelectedShipType = type;
                 RefreshShipButtons();
             };
         }
 
         _readyButton.Click += (_, _) => ReadyRequested?.Invoke();
         _undoButton.Click += (_, _) => UndoRequested?.Invoke();
-        SelectedLength = 4;
+        SelectedShipType = ShipType.AircraftCarrier;
         RefreshShipButtons();
     }
 
-    public int SelectedLength { get; private set; }
+    public ShipType SelectedShipType { get; private set; }
 
     public ShipOrientation SelectedOrientation => _shipOrientationComboBox.SelectedIndex == 1
         ? ShipOrientation.Vertical
         : ShipOrientation.Horizontal;
 
-    public bool CanPlaceSelectedShip => !_isReady && _remainingShips[SelectedLength] > 0;
+    public int PointsSpent => _shipCounts.Sum(entry => entry.Value * ShipCatalogue.Create(entry.Key).PointCost);
 
-    public bool HasCompleteFleet => _remainingShips.Values.All(remaining => remaining == 0);
+    public int PointsRemaining => ShipCatalogue.PointBudget - PointsSpent;
 
-    public bool MarkShipPlaced(int length)
+    public bool CanPlaceSelectedShip => CanPlaceShip(SelectedShipType);
+
+    public bool HasCompleteFleet => PointsRemaining == 0;
+
+    public bool CanPlaceShip(ShipType type) =>
+        !_isReady && Enum.IsDefined(type) && ShipCatalogue.Create(type).PointCost <= PointsRemaining;
+
+    public bool MarkShipPlaced(ShipType type)
     {
-        if (_isReady || !_remainingShips.TryGetValue(length, out int remaining) || remaining == 0)
+        if (!CanPlaceShip(type))
         {
             return false;
         }
 
-        _remainingShips[length] = remaining - 1;
+        _shipCounts[type] = _shipCounts.GetValueOrDefault(type) + 1;
         RefreshShipButtons();
         return true;
     }
@@ -90,14 +93,22 @@ internal sealed class ShipPanel : Panel
         RefreshShipButtons();
     }
 
-    public void MarkShipRemoved(int length)
+    public void MarkShipRemoved(ShipType type)
     {
-        if (!_remainingShips.ContainsKey(length))
+        if (!_shipCounts.TryGetValue(type, out int count))
         {
             return;
         }
 
-        _remainingShips[length]++;
+        if (count == 1)
+        {
+            _shipCounts.Remove(type);
+        }
+        else
+        {
+            _shipCounts[type] = count - 1;
+        }
+
         _isReady = false;
         RefreshShipButtons();
     }
@@ -110,11 +121,8 @@ internal sealed class ShipPanel : Panel
 
     public void Reset()
     {
-        _remainingShips[4] = 1;
-        _remainingShips[3] = 2;
-        _remainingShips[2] = 3;
-        _remainingShips[1] = 4;
-        SelectedLength = 4;
+        _shipCounts.Clear();
+        SelectedShipType = ShipType.AircraftCarrier;
         _undoEnabled = false;
         _isReady = false;
         RefreshShipButtons();
@@ -122,14 +130,24 @@ internal sealed class ShipPanel : Panel
 
     private void RefreshShipButtons()
     {
-        foreach (var (length, button) in _shipButtons)
+        foreach (var (type, button) in _shipButtons)
         {
-            int remaining = _remainingShips[length];
-            button.Content = $"{(SelectedLength == length ? "> " : string.Empty)}Length {length} ({remaining} left)";
-            button.Background = SelectedLength == length ? Brushes.LightBlue : Brushes.Transparent;
-            button.IsEnabled = remaining > 0 && !_isReady;
+            var ship = ShipCatalogue.Create(type);
+            int count = _shipCounts.GetValueOrDefault(type);
+            bool isSelected = SelectedShipType == type;
+            string strategyName = ship.UnlockedStrategy switch
+            {
+                ShotStrategyType.Line => "Line Shot",
+                ShotStrategyType.Spread => "Spread Shot",
+                ShotStrategyType.Ring => "Ring Shot",
+                _ => "No special shot"
+            };
+            button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({ship.PointCost} AP; {strategyName}, placed {count})";
+            button.Background = isSelected ? Brushes.LightBlue : Brushes.Transparent;
+            button.IsEnabled = CanPlaceShip(type);
         }
 
+        _pointsText.Text = $"Points: {PointsSpent}/{ShipCatalogue.PointBudget}";
         _readyButton.IsEnabled = HasCompleteFleet && !_isReady;
         _undoButton.IsEnabled = _undoEnabled && !_isReady;
     }

@@ -6,6 +6,7 @@ using Avalonia.Media;
 using BattleShip.Shared;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BattleShip.Client;
 
@@ -204,13 +205,9 @@ public static class PanelFactory
 
     private static ShipPanel CreateShipPanel()
     {
-        var shipButtons = new Dictionary<int, Button>
-        {
-            [4] = new Button { HorizontalAlignment = HorizontalAlignment.Stretch },
-            [3] = new Button { HorizontalAlignment = HorizontalAlignment.Stretch },
-            [2] = new Button { HorizontalAlignment = HorizontalAlignment.Stretch },
-            [1] = new Button { HorizontalAlignment = HorizontalAlignment.Stretch },
-        };
+        var shipButtons = ShipCatalogue.AllTypes.ToDictionary(
+            type => type,
+            _ => new Button { HorizontalAlignment = HorizontalAlignment.Stretch });
 
         var orientationComboBox = new ComboBox
         {
@@ -233,24 +230,21 @@ public static class PanelFactory
             Content = "Undo",
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
+        var pointsText = new TextBlock();
 
-        var layout = new StackPanel
+        var layout = new StackPanel { Spacing = 8 };
+        layout.Children.Add(new TextBlock { Text = "Select ships (duplicates allowed)" });
+        foreach (var button in shipButtons.Values)
         {
-            Spacing = 8,
-            Children =
-            {
-                new TextBlock { Text = "Select a ship" },
-                shipButtons[4],
-                shipButtons[3],
-                shipButtons[2],
-                shipButtons[1],
-                new TextBlock { Text = "Orientation" },
-                orientationComboBox,
-                readyButton,
-                undoButton,
-            },
-        };
+            layout.Children.Add(button);
+        }
 
-        return new ShipPanel(layout, shipButtons, orientationComboBox, readyButton, undoButton);
+        layout.Children.Add(new TextBlock { Text = "Orientation" });
+        layout.Children.Add(orientationComboBox);
+        layout.Children.Add(pointsText);
+        layout.Children.Add(readyButton);
+        layout.Children.Add(undoButton);
+
+        return new ShipPanel(layout, shipButtons, orientationComboBox, readyButton, undoButton, pointsText);
     }
 }
