@@ -212,13 +212,73 @@ public class GridModel : IPrototype<GridModel>
         return cells;
     }
 
+    public int[] ToShotCodes()
+    {
+        var shotCodes = new int[Size * Size];
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                shotCodes[y * Size + x] = _shots[x, y];
+            }
+        }
+
+        return shotCodes;
+    }
+
+    public CellState[] ToUnfiredFlatArray()
+    {
+        var cells = new CellState[Size * Size];
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                var state = _cells[x, y];
+                cells[y * Size + x] = state == CellState.Fired ? CellState.Empty : state;
+            }
+        }
+
+        return cells;
+    }
+
+    public IReadOnlyList<ShotMark> GetShotMarks()
+    {
+        var marks = new List<ShotMark>();
+
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                var shotCode = _shots[x, y];
+                if (shotCode == 0)
+                {
+                    continue;
+                }
+
+                marks.Add(new ShotMark(x, y, shotCode == ShotHit, shotCode == ShotObstacle));
+            }
+        }
+
+        return marks;
+    }
+
     public bool TryMarkFired(int x, int y)
     {
         if (_cells[x, y] == CellState.Fired) return false;
-        if (_cells[x, y] == CellState.Ship && _shipOwners[x, y] >= 0)
+
+        var previousState = _cells[x, y];
+        if (previousState == CellState.Ship && _shipOwners[x, y] >= 0)
         {
             _placedShips[_shipOwners[x, y]].RemainingCells--;
         }
+
+        _shots[x, y] = previousState switch
+        {
+            CellState.Ship => ShotHit,
+            CellState.Obstacle => ShotObstacle,
+            CellState.PowerUp => ShotMissOnPowerUp,
+            _ => ShotMiss,
+        };
 
         _cells[x, y] = CellState.Fired;
         return true;

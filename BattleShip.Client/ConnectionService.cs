@@ -80,7 +80,7 @@ public class ConnectionService
     public Task<string> SaveGameAsync()
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
-        return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
+        return _connection.InvokeAsync<string>("SaveGame");
     }
 
     private void Notify(Action<IGameEventObserver> notification)
