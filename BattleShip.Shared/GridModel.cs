@@ -5,6 +5,8 @@ public class GridModel : IPrototype<GridModel>
     public const int Size = 10;
 
     private readonly CellState[,] _cells = new CellState[Size, Size];
+    private readonly int[,] _shipOwners = new int[Size, Size];
+    private readonly List<PlacedShip> _placedShips = [];
     private readonly byte[,] _shots = new byte[Size, Size];
 
     private const byte ShotMiss = 1;
@@ -102,12 +104,13 @@ public class GridModel : IPrototype<GridModel>
 
     public bool TryPlaceShips(IReadOnlyList<ShipPlacement>? placements)
     {
-        if (placements is null || placements.Count == 0)
+        if (placements is null || placements.Count == 0 || _placedShips.Count > 0)
         {
             return false;
         }
 
         var shipOwners = new int[Size, Size];
+        var newShips = new List<PlacedShip>(placements.Count);
         for (int x = 0; x < Size; x++)
         {
             for (int y = 0; y < Size; y++)
@@ -123,27 +126,23 @@ public class GridModel : IPrototype<GridModel>
         for (int shipIndex = 0; shipIndex < placements.Count; shipIndex++)
         {
             var placement = placements[shipIndex];
-            if (placement is null || placement.Length < 1 || placement.Length > Size)
+            if (placement is null || !Enum.IsDefined(placement.Type))
             {
                 return false;
             }
 
-            (int dx, int dy) = placement.Orientation switch
-            {
-                ShipOrientation.Horizontal => (1, 0),
-                ShipOrientation.Vertical => (0, 1),
-                _ => (0, 0)
-            };
-
-            if (dx == 0 && dy == 0)
+            var ship = ShipCatalogue.Create(placement.Type);
+            var offsets = ship.GetOffsets(placement.Orientation);
+            if (offsets.Count == 0)
             {
                 return false;
             }
 
-            for (int offset = 0; offset < placement.Length; offset++)
+            var occupiedCells = new List<GridPosition>(offsets.Count);
+            foreach (var offset in offsets)
             {
-                int x = placement.X + dx * offset;
-                int y = placement.Y + dy * offset;
+                int x = placement.X + offset.X;
+                int y = placement.Y + offset.Y;
                 if (!IsInsideBounds(x, y) || _cells[x, y] != CellState.Empty || shipOwners[x, y] != -1)
                 {
                     return false;
@@ -163,7 +162,10 @@ public class GridModel : IPrototype<GridModel>
                 }
 
                 shipOwners[x, y] = shipIndex;
+                occupiedCells.Add(new GridPosition(x, y));
             }
+
+            newShips.Add(new PlacedShip(ship, occupiedCells));
         }
 
         for (int x = 0; x < Size; x++)
@@ -173,11 +175,27 @@ public class GridModel : IPrototype<GridModel>
                 if (shipOwners[x, y] != -1)
                 {
                     _cells[x, y] = CellState.Ship;
+                    _shipOwners[x, y] = shipOwners[x, y];
                 }
             }
         }
 
+        _placedShips.AddRange(newShips);
         return true;
+    }
+
+    public IReadOnlyList<ShotStrategyType> GetAvailableShotStrategies()
+    {
+        var strategies = new HashSet<ShotStrategyType> { ShotStrategyType.Single };
+        foreach (var ship in _placedShips)
+        {
+            if (ship.RemainingCells > 0 && ship.Ship.UnlockedStrategy is { } strategy)
+            {
+                strategies.Add(strategy);
+            }
+        }
+
+        return strategies.OrderBy(strategy => strategy).ToArray();
     }
 
     public CellState[] ToFlatArray()
@@ -196,69 +214,8 @@ public class GridModel : IPrototype<GridModel>
 
     public bool TryMarkFired(int x, int y)
     {
-        var previous = _cells[x, y];
-        if (previous == CellState.Fired) return false;
-        _shots[x, y] = previous switch
-        {
-            CellState.Ship => ShotHit,
-            CellState.Obstacle => ShotObstacle,
-            CellState.PowerUp => ShotMissOnPowerUp,
-            _ => ShotMiss
-        };
+        if (_cells[x, y] == CellState.Fired) return false;
         _cells[x, y] = CellState.Fired;
         return true;
-    }
-
-    public int[] ToShotCodes()
-    {
-        var codes = new int[Size * Size];
-        for (int y = 0; y < Size; y++)
-        {
-            for (int x = 0; x < Size; x++)
-            {
-                codes[y * Size + x] = _shots[x, y];
-            }
-        }
-
-        return codes;
-    }
-
-    public IReadOnlyList<ShotMark> GetShotMarks()
-    {
-        var marks = new List<ShotMark>();
-        for (int y = 0; y < Size; y++)
-        {
-            for (int x = 0; x < Size; x++)
-            {
-                var code = _shots[x, y];
-                if (code != 0)
-                {
-                    marks.Add(new ShotMark(x, y, code == ShotHit, code == ShotObstacle));
-                }
-            }
-        }
-
-        return marks;
-    }
-
-    public CellState[] ToUnfiredFlatArray()
-    {
-        var cells = ToFlatArray();
-        for (int y = 0; y < Size; y++)
-        {
-            for (int x = 0; x < Size; x++)
-            {
-                if (cells[y * Size + x] != CellState.Fired) continue;
-                cells[y * Size + x] = _shots[x, y] switch
-                {
-                    ShotHit => CellState.Ship,
-                    ShotObstacle => CellState.Obstacle,
-                    ShotMissOnPowerUp => CellState.PowerUp,
-                    _ => CellState.Empty
-                };
-            }
-        }
-
-        return cells;
     }
 }

@@ -45,12 +45,9 @@ internal sealed class BoardPanel : Panel
 
     public void ApplyShipPlacement(ShipPlacement placement)
     {
-        int dx = placement.Orientation == ShipOrientation.Horizontal ? 1 : 0;
-        int dy = placement.Orientation == ShipOrientation.Vertical ? 1 : 0;
-
-        for (int offset = 0; offset < placement.Length; offset++)
+        foreach (var offset in ShipCatalogue.Create(placement.Type).GetOffsets(placement.Orientation))
         {
-            var cell = _cells[placement.X + dx * offset, placement.Y + dy * offset];
+            var cell = _cells[placement.X + offset.X, placement.Y + offset.Y];
             cell.Content = "X";
             cell.Background = Brushes.SteelBlue;
             cell.IsEnabled = false;

@@ -112,14 +112,16 @@ public class GameHub : Hub
 
     public async Task FireShot(FireShotRequest request)
     {
+        if (request is null) return;
         if (!SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) || session is null) return;
 
-        var targets = request.Targets ?? Array.Empty<ShotTarget>();
-        bool success = session.TryFireShotPattern(Context.ConnectionId, targets, out var outcomes);
+        bool success = session.TryFireShotPattern(Context.ConnectionId, request, out var outcomes);
         if (!success) return; // Invalid move
 
         var opponentId = session.OpponentOf(Context.ConnectionId);
         var lastIndex = outcomes.Count - 1;
+        var shooterStrategies = session.GetAvailableShotStrategies(Context.ConnectionId).ToArray();
+        var defenderStrategies = session.GetAvailableShotStrategies(opponentId).ToArray();
 
         for (int i = 0; i < outcomes.Count; i++)
         {
@@ -127,10 +129,12 @@ public class GameHub : Hub
             bool isYourTurnNext = i == lastIndex;
 
             await Clients.Client(Context.ConnectionId)
-                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle, IsYourTurnNext: false));
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle,
+                    IsYourTurnNext: false, AvailableShotStrategies: shooterStrategies));
 
             await Clients.Client(opponentId)
-                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle, IsYourTurnNext: isYourTurnNext));
+                .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle,
+                    IsYourTurnNext: isYourTurnNext, AvailableShotStrategies: defenderStrategies));
         }
     }
 

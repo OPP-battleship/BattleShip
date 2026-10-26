@@ -71,10 +71,10 @@ public class ConnectionService
         return _connection.InvokeAsync("SubmitShipPlacement", new SubmitShipPlacementRequest(sessionId, ships.ToArray()));
     }
 
-    public Task FireShotAsync(IEnumerable<ShotTarget> targets)
+    public Task FireShotAsync(ShotStrategyType strategy, int originX, int originY, ShotOrientation lineOrientation)
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
-        return _connection.InvokeAsync("FireShot", new FireShotRequest(targets.ToArray()));
+        return _connection.InvokeAsync("FireShot", new FireShotRequest(strategy, originX, originY, lineOrientation));
     }
 
     public Task<string> SaveGameAsync()
