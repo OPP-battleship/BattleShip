@@ -13,6 +13,9 @@ public abstract class GameEventObserverDecorator(IGameEventObserver inner) : IGa
     public virtual void OnPlacementStarted(PlacementStartedMessage message) =>
         Inner.OnPlacementStarted(message);
 
+    public virtual void OnPlacementCompleted(PlacementCompletedMessage message) =>
+        Inner.OnPlacementCompleted(message);
+
     public virtual void OnGameStarted(GameStartedMessage message) =>
         Inner.OnGameStarted(message);
 

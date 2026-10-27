@@ -47,6 +47,8 @@ public class ConnectionService
 
         _connection.On<PlacementStartedMessage>("PlacementStarted", message =>
             Notify(observer => observer.OnPlacementStarted(message)));
+        _connection.On<PlacementCompletedMessage>("PlacementCompleted", message =>
+            Notify(observer => observer.OnPlacementCompleted(message)));
         _connection.On<GameStartedMessage>("GameStarted", message =>
             Notify(observer => observer.OnGameStarted(message)));
         _connection.On<GameResumedMessage>("GameResumed", message =>

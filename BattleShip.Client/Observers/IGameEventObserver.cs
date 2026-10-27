@@ -9,6 +9,8 @@ public interface IGameEventObserver
 {
     void OnPlacementStarted(PlacementStartedMessage message);
 
+    void OnPlacementCompleted(PlacementCompletedMessage message);
+
     void OnGameStarted(GameStartedMessage message);
 
     void OnGameResumed(GameResumedMessage message);

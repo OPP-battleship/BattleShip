@@ -9,6 +9,8 @@ public sealed class SpreadShotStrategy : IShotStrategy
         _size = Math.Max(1, size);
     }
 
+    public int Size => _size;
+
     public IReadOnlyList<ShotTarget> GetTargets(int originX, int originY)
     {
         var targets = new List<ShotTarget>(_size * _size);

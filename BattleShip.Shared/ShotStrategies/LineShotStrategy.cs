@@ -9,6 +9,8 @@ public sealed class LineShotStrategy : IShotStrategy
         _orientation = orientation;
     }
 
+    public ShotOrientation Orientation => _orientation;
+
     public IReadOnlyList<ShotTarget> GetTargets(int originX, int originY)
     {
         var targets = new List<ShotTarget>(GridModel.Size);

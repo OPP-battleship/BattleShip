@@ -25,6 +25,12 @@ public sealed class LoggingGameEventObserverDecorator : GameEventObserverDecorat
         base.OnPlacementStarted(message);
     }
 
+    public override void OnPlacementCompleted(PlacementCompletedMessage message)
+    {
+        Write($"Ship placement completed for session {message.SessionId}.");
+        base.OnPlacementCompleted(message);
+    }
+
     public override void OnGameStarted(GameStartedMessage message)
     {
         Write($"Game started for session {message.SessionId}; you go first: {message.YouGoFirst}.");

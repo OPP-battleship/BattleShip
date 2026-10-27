@@ -25,6 +25,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     private string? _myConnectionId;
     private string? _sessionId;
+    private string? _latestPowerUpNotice;
     private bool _isMyTurn;
 
     public MainWindow()
@@ -83,8 +84,33 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         PlacementStatusText.Text = $"Select ships and click their starting cell. Spend all {ShipCatalogue.PointBudget} points. Ships cannot touch.";
     }
 
+    public void OnPlacementCompleted(PlacementCompletedMessage msg)
+    {
+        if (msg.SessionId != _sessionId || _placementBoardState is null)
+        {
+            return;
+        }
+
+        _placementBoardState = (CellState[])msg.Board.Clone();
+        _placementBlockedCells.Clear();
+        for (int y = 0; y < GridModel.Size; y++)
+        {
+            for (int x = 0; x < GridModel.Size; x++)
+            {
+                if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
+                {
+                    _placementBlockedCells.Add((x, y));
+                }
+            }
+        }
+
+        RefreshPlacementBoard();
+        PlacementStatusText.Text = "Ships placed. Power-ups have appeared. Waiting for your opponent...";
+    }
+
     public void OnGameStarted(GameStartedMessage msg)
     {
+        _latestPowerUpNotice = null;
         _isMyTurn = msg.YouGoFirst;
         _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         BuildGrids(msg.YourBoard);
@@ -130,6 +156,16 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     {
         _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         bool iShotThis = msg.ShooterConnectionId == _myConnectionId;
+        if (iShotThis && msg.CollectedPowerUp is { } powerUp)
+        {
+            _latestPowerUpNotice = powerUp switch
+            {
+                PowerUpType.ShotAreaUp => "Shot Area Up collected; your next shot is enlarged.",
+                PowerUpType.ExtraTurn => "Extra Turn collected.",
+                PowerUpType.FreeShot => "Free Shot collected; any strategy is available for your next shot.",
+                _ => "Power-up collected."
+            };
+        }
 
         var target = iShotThis ? _enemyBoard : _yourBoard;
         target?.ApplyShot(msg.X, msg.Y, msg.IsHit, msg.IsObstacle);
@@ -157,6 +193,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _placementCommands.Clear();
         _shipPanel.Reset();
         _shipPanel.SetUndoEnabled(false);
+        _latestPowerUpNotice = null;
     }
 
     private void OnPlacementCellClicked(int x, int y)
@@ -312,6 +349,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     private void UpdateTurnText()
     {
-        TurnText.Text = _isMyTurn ? "Your turn" : "Opponent's turn";
+        var turn = _isMyTurn ? "Your turn" : "Opponent's turn";
+        TurnText.Text = _latestPowerUpNotice is null
+            ? turn
+            : $"{turn} — {_latestPowerUpNotice}";
     }
 }
