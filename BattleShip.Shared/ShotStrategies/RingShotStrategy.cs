@@ -2,11 +2,23 @@ namespace BattleShip.Shared;
 
 public sealed class RingShotStrategy : IShotStrategy
 {
-    private const int Radius = 2;
+    public const int DefaultRadius = 2;
+
+    public RingShotStrategy(int radius = DefaultRadius)
+    {
+        if (radius < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius));
+        }
+
+        Radius = radius;
+    }
+
+    public int Radius { get; }
 
     public IReadOnlyList<ShotTarget> GetTargets(int originX, int originY)
     {
-        var targets = new List<ShotTarget>(16);
+        var targets = new List<ShotTarget>(Radius * 8);
 
         for (int yOffset = -Radius; yOffset <= Radius; yOffset++)
         {
