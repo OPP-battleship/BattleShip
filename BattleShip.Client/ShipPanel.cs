@@ -133,6 +133,7 @@ internal sealed class ShipPanel : Panel
         foreach (var (type, button) in _shipButtons)
         {
             var ship = ShipCatalogue.Create(type);
+            var view = new ShipButtonView(ship);
             int count = _shipCounts.GetValueOrDefault(type);
             bool isSelected = SelectedShipType == type;
             string strategyName = ship.UnlockedStrategy switch
@@ -142,8 +143,8 @@ internal sealed class ShipPanel : Panel
                 ShotStrategyType.Ring => "Ring Shot",
                 _ => "No special shot"
             };
-            button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({ship.PointCost} AP; {strategyName}, placed {count})";
-            button.Background = isSelected ? Brushes.LightBlue : Brushes.Transparent;
+            button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({view.PointCost} AP; {strategyName}, placed {count})";
+            button.Background = view.Fill;
             button.IsEnabled = CanPlaceShip(type);
         }
 
