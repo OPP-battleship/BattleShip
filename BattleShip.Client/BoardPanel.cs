@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using BattleShip.Shared;
 using System;
+using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
@@ -9,6 +10,7 @@ internal sealed class BoardPanel : Panel
 {
     private readonly Button[,] _cells;
     private readonly bool[,] _fired;
+    private readonly HashSet<GridPosition> _submarineCells = [];
 
     public event Action<int, int>? CellClicked;
 
@@ -29,6 +31,43 @@ internal sealed class BoardPanel : Panel
     }
 
     public bool HasBeenFired(int x, int y) => _fired[x, y];
+
+    public bool IsSubmarineCell(int x, int y) =>
+        _submarineCells.Contains(new GridPosition(x, y));
+
+    public void SetSubmarineCells(IEnumerable<GridPosition> cells)
+    {
+        _submarineCells.Clear();
+        foreach (var position in cells)
+        {
+            if (!GridModel.IsInsideBounds(position.X, position.Y))
+            {
+                continue;
+            }
+
+            _submarineCells.Add(position);
+            if (!_fired[position.X, position.Y])
+            {
+                _cells[position.X, position.Y].Content = "S";
+                _cells[position.X, position.Y].Background = Brushes.DarkSlateBlue;
+            }
+        }
+    }
+
+    public void SetSelectedMoveCell(GridPosition? position)
+    {
+        foreach (var cell in _submarineCells)
+        {
+            if (_fired[cell.X, cell.Y])
+            {
+                continue;
+            }
+
+            _cells[cell.X, cell.Y].Background = position == cell
+                ? Brushes.Gold
+                : Brushes.DarkSlateBlue;
+        }
+    }
 
     public void ApplyShot(int x, int y, bool isHit, bool isObstacle)
     {
@@ -53,8 +92,10 @@ internal sealed class BoardPanel : Panel
         foreach (var position in view.Cells)
         {
             var cell = _cells[position.X, position.Y];
-            cell.Content = view.Marker;
-            cell.Background = view.Fill;
+            cell.Content = placement.Type == ShipType.Submarine ? "S" : view.Marker;
+            cell.Background = placement.Type == ShipType.Submarine
+                ? Brushes.DarkSlateBlue
+                : view.Fill;
             cell.IsEnabled = false;
         }
     }

@@ -122,7 +122,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _hasSubmarine = msg.HasSubmarine;
         _isMyTurn = msg.YouGoFirst;
         _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
-        BuildGrids(msg.YourBoard);
+        BuildGrids(msg.YourBoard, msg.SubmarineCells ?? []);
+        MoveHintText.IsVisible = false;
+        MoveHintText.Text = "Click a cell marked S to select your submarine, then a straight-line destination up to 2 cells away. Moving uses your turn.";
         BuildScoreboard();
         PlacementPanel.IsVisible = false;
         GamePanel.IsVisible = true;
@@ -138,7 +140,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _sessionId = msg.SessionId;
         _myConnectionId = _gameFacade.MyConnectionId;
         _isMyTurn = msg.IsYourTurn;
-        BuildGrids(msg.YourBoard);
+        BuildGrids(msg.YourBoard, msg.SubmarineCells ?? []);
+        MoveHintText.IsVisible = false;
+        MoveHintText.Text = "Click a cell marked S to select your submarine, then a straight-line destination up to 2 cells away. Moving uses your turn.";
         BuildScoreboard();
 
         foreach (var shot in msg.ShotsAtYou)
@@ -189,6 +193,11 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         }
 
         _isMyTurn = msg.IsYourTurnNext;
+        if (!_isMyTurn)
+        {
+            CancelMoveMode();
+        }
+
         UpdateTurnText();
     }
 
@@ -196,7 +205,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     {
         if (msg.YourBoard is { } board)
         {
-            BuildYourBoard(board);
+            BuildYourBoard(board, msg.SubmarineCells ?? []);
             foreach (var shot in msg.YourShotsAtYou ?? [])
             {
                 _yourBoard?.ApplyShot(shot.X, shot.Y, shot.IsHit, shot.IsObstacle);
@@ -206,7 +215,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _isMoveMode = false;
         _moveOrigin = null;
         _movePending = false;
+        MoveHintText.IsVisible = false;
         _isMyTurn = msg.IsYourTurnNext;
+        MoveHintText.Text = "Submarine moved. The move used your turn.";
         UpdateTurnText();
     }
 
@@ -218,6 +229,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         MenuPanel.IsVisible = true;
         FindMatchButton.IsEnabled = true;
         _sessionId = null;
+        MoveHintText.IsVisible = false;
         _hasSubmarine = false;
         _isMoveMode = false;
         _moveOrigin = null;
@@ -332,12 +344,12 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         PlacementGrid.Children.Add(_placementBoard);
     }
 
-    private void BuildGrids(CellState[] board)
+    private void BuildGrids(CellState[] board, IReadOnlyList<GridPosition> submarineCells)
     {
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
 
-        BuildYourBoard(board);
+        BuildYourBoard(board, submarineCells);
 
         var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
         _enemyBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Enemy, hiddenEnemyBoard,
@@ -345,11 +357,12 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         EnemyGrid.Children.Add(_enemyBoard);
     }
 
-    private void BuildYourBoard(CellState[] board)
+    private void BuildYourBoard(CellState[] board, IReadOnlyList<GridPosition> submarineCells)
     {
         YourGrid.Children.Clear();
         _yourBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(
             PanelFactory.Board, BoardCellOwner.Player, board, OnYourCellClicked);
+        _yourBoard.SetSubmarineCells(submarineCells);
         YourGrid.Children.Add(_yourBoard);
     }
 
@@ -362,7 +375,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     }
     private async void OnEnemyCellClicked(int x, int y)
     {
-        if (!_isMyTurn) return;
+        if (!_isMyTurn || _isMoveMode || _movePending) return;
 
         var lineOrientation = _controlsPanel.LineOrientationSelectedIndex == 1
             ? ShotOrientation.Vertical
@@ -438,6 +451,11 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
         _isMoveMode = !_isMoveMode;
         _moveOrigin = null;
+        _yourBoard?.SetSelectedMoveCell(null);
+        MoveHintText.IsVisible = _isMoveMode;
+        MoveHintText.Text = _isMoveMode
+            ? "Move mode: click a cell marked S to select your submarine."
+            : "Click a cell marked S to select your submarine, then a straight-line destination up to 2 cells away. Moving uses your turn.";
         UpdateTurnText();
     }
 
@@ -451,18 +469,27 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         var clicked = new GridPosition(x, y);
         if (_moveOrigin is null)
         {
+            if (_yourBoard?.IsSubmarineCell(x, y) != true)
+            {
+                MoveHintText.Text = "That is not your submarine. Select a cell marked S on your board.";
+                return;
+            }
+
             _moveOrigin = clicked;
-            TurnText.Text = "Select the submarine's destination cell.";
+            _yourBoard?.SetSelectedMoveCell(clicked);
+            MoveHintText.Text = "Submarine selected. Click a destination in a straight line, 1 or 2 cells away.";
             return;
         }
 
         var origin = _moveOrigin.Value;
         int deltaX = x - origin.X;
         int deltaY = y - origin.Y;
-        if ((deltaX == 0 && deltaY == 0) || (deltaX != 0 && deltaY != 0))
+        int distance = Math.Abs(deltaX) + Math.Abs(deltaY);
+        if ((deltaX == 0 && deltaY == 0) ||
+            (deltaX != 0 && deltaY != 0) ||
+            distance > 2)
         {
-            _moveOrigin = clicked;
-            TurnText.Text = "Select a straight-line destination, up to two cells away.";
+            MoveHintText.Text = "Invalid destination. Select a different cell in a straight line, up to 2 cells away.";
             return;
         }
 
@@ -475,7 +502,8 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             {
                 _movePending = false;
                 _moveOrigin = null;
-                TurnText.Text = "Move rejected. Choose an undamaged submarine and a legal destination.";
+                _yourBoard?.SetSelectedMoveCell(null);
+                MoveHintText.Text = "Move rejected. Choose an undamaged submarine and a legal destination.";
                 _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
             }
         }
@@ -483,9 +511,19 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         {
             _movePending = false;
             _moveOrigin = null;
-            TurnText.Text = $"Could not move ship: {ex.Message}";
+            _yourBoard?.SetSelectedMoveCell(null);
+            MoveHintText.Text = $"Could not move ship: {ex.Message}";
             _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
         }
+    }
+
+    private void CancelMoveMode()
+    {
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
+        MoveHintText.IsVisible = false;
+        _yourBoard?.SetSelectedMoveCell(null);
     }
 
     private async void OnSaveGameClicked(object? sender, RoutedEventArgs e)
@@ -509,11 +547,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private void UpdateTurnText()
     {
         var turn = _isMyTurn ? "Your turn" : "Opponent's turn";
-        TurnText.Text = _isMoveMode
-            ? _moveOrigin is null
-                ? "Select an undamaged submarine cell to move."
-                : "Select the submarine's destination cell."
-            : _latestPowerUpNotice is null
+        TurnText.Text = _latestPowerUpNotice is null
             ? turn
             : $"{turn} — {_latestPowerUpNotice}";
         _controlsPanel.SetMoveButton(

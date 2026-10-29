@@ -28,7 +28,7 @@ public sealed class ShipDirector
     {
         var builder = new SpecialOperationsShipBuilder();
         builder.Reset(createProduct);
-        builder.InstallPressureDrive();
+        builder.InstallMovement();
         builder.SetPointCost(2);
         builder.BuildHullSection([new(0, 0)]);
         builder.BuildHullSection([new(1, 0)]);
@@ -84,4 +84,5 @@ public sealed class ShipDirector
         builder.Reset(createProduct);
         return builder;
     }
+
 }

@@ -32,16 +32,19 @@
                 <!--GAME SCREEN-->
                 <Grid Name="GamePanel" IsVisible="False" RowDefinitions="Auto,*" ColumnDefinitions="*,*" Margin="20">
                         <Panel Name="ScoreboardGrid" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12"/>
+                        <TextBlock Name="TurnText" Grid.Row="0" Grid.ColumnSpan="2"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   FontSize="16" FontWeight="Bold" Margin="0,0,12,12"/>
                         <StackPanel Grid.Row="1" Grid.Column="0" Spacing="8">
                                 <TextBlock Text="Your Board" FontSize="18" HorizontalAlignment="Center"/>
                                 <Panel Name="YourGrid"/>
+                                <TextBlock Name="MoveHintText" IsVisible="False" TextWrapping="Wrap" MaxWidth="400" FontSize="12" Opacity="0.8"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Grid.Column="1" Spacing="8">
                                 <TextBlock Text="Enemy Board" FontSize="18" HorizontalAlignment="Center"/>
                                 <Panel Name="EnemyGrid"/>
                                 <Panel Name="ControlsGrid"/>
-                                <TextBlock Name="TurnText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
                                 <Button Name="SaveGameButton" Content="Save Game" Click="OnSaveGameClicked" HorizontalAlignment="Center"/>
                                 <TextBlock Name="SaveStatusText" Text="" HorizontalAlignment="Center" Opacity="0.7"/>
                         </StackPanel>
