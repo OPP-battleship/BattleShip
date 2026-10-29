@@ -23,6 +23,9 @@ public sealed class ExceptionHandlingGameEventObserverDecorator : GameEventObser
     public override void OnPlacementStarted(PlacementStartedMessage message) =>
         Execute(nameof(OnPlacementStarted), () => base.OnPlacementStarted(message));
 
+    public override void OnPlacementCompleted(PlacementCompletedMessage message) =>
+        Execute(nameof(OnPlacementCompleted), () => base.OnPlacementCompleted(message));
+
     public override void OnGameStarted(GameStartedMessage message) =>
         Execute(nameof(OnGameStarted), () => base.OnGameStarted(message));
 
@@ -31,6 +34,9 @@ public sealed class ExceptionHandlingGameEventObserverDecorator : GameEventObser
 
     public override void OnShotResult(ShotResultMessage message) =>
         Execute(nameof(OnShotResult), () => base.OnShotResult(message));
+
+    public override void OnShipMoved(ShipMovedMessage message) =>
+        Execute(nameof(OnShipMoved), () => base.OnShipMoved(message));
 
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Execute(nameof(OnOpponentDisconnected), () => base.OnOpponentDisconnected(message));

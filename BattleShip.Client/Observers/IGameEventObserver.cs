@@ -9,11 +9,15 @@ public interface IGameEventObserver
 {
     void OnPlacementStarted(PlacementStartedMessage message);
 
+    void OnPlacementCompleted(PlacementCompletedMessage message);
+
     void OnGameStarted(GameStartedMessage message);
 
     void OnGameResumed(GameResumedMessage message);
 
     void OnShotResult(ShotResultMessage message);
+
+    void OnShipMoved(ShipMovedMessage message);
 
     void OnOpponentDisconnected(OpponentDisconnectedMessage message);
 }

@@ -13,6 +13,9 @@ public abstract class GameEventObserverDecorator(IGameEventObserver inner) : IGa
     public virtual void OnPlacementStarted(PlacementStartedMessage message) =>
         Inner.OnPlacementStarted(message);
 
+    public virtual void OnPlacementCompleted(PlacementCompletedMessage message) =>
+        Inner.OnPlacementCompleted(message);
+
     public virtual void OnGameStarted(GameStartedMessage message) =>
         Inner.OnGameStarted(message);
 
@@ -21,6 +24,9 @@ public abstract class GameEventObserverDecorator(IGameEventObserver inner) : IGa
 
     public virtual void OnShotResult(ShotResultMessage message) =>
         Inner.OnShotResult(message);
+
+    public virtual void OnShipMoved(ShipMovedMessage message) =>
+        Inner.OnShipMoved(message);
 
     public virtual void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Inner.OnOpponentDisconnected(message);

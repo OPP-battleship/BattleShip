@@ -6,10 +6,10 @@ public abstract class Ship : IShipBackend
     public int PointCost { get; private set; }
     public IReadOnlyList<GridPosition> Shape { get; private set; } = Array.Empty<GridPosition>();
     public ShotStrategyType? UnlockedStrategy { get; private set; }
+    public ShipMovementCapability? MovementCapability { get; private set; }
 
     private bool _hasPointCost;
     private bool _hasShape;
-    private bool _hasUnlockedStrategy;
 
     protected Ship()
     {
@@ -43,7 +43,16 @@ public abstract class Ship : IShipBackend
     internal void ConfigureUnlockedStrategy(ShotStrategyType? unlockedStrategy)
     {
         UnlockedStrategy = unlockedStrategy;
-        _hasUnlockedStrategy = true;
+    }
+
+    internal void ConfigureMovementCapability(ShipMovementCapability? movementCapability)
+    {
+        if (movementCapability is { MaximumDistance: <= 0 })
+        {
+            throw new ArgumentOutOfRangeException(nameof(movementCapability));
+        }
+
+        MovementCapability = movementCapability;
     }
 
     public IReadOnlyList<GridPosition> GetOffsets(ShipOrientation orientation)
@@ -57,7 +66,7 @@ public abstract class Ship : IShipBackend
         };
     }
 
-    internal bool IsConfigured => _hasPointCost && _hasShape && _hasUnlockedStrategy;
+    internal bool IsConfigured => _hasPointCost && _hasShape;
 
     private void EnsureConfigured()
     {

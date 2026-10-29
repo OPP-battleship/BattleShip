@@ -32,6 +32,9 @@ public sealed class GameFacade
     public Task FireShotAsync(ShotStrategyType strategy, int originX, int originY, ShotOrientation lineOrientation) =>
         _connectionService.FireShotAsync(strategy, originX, originY, lineOrientation);
 
+    public Task<bool> MoveShipAsync(int fromX, int fromY, int deltaX, int deltaY) =>
+        _connectionService.MoveShipAsync(fromX, fromY, deltaX, deltaY);
+
     public Task<string> SaveGameAsync() => _connectionService.SaveGameAsync();
 
     public bool TryValidateShipPlacement(

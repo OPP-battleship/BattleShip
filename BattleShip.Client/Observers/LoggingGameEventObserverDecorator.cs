@@ -25,6 +25,12 @@ public sealed class LoggingGameEventObserverDecorator : GameEventObserverDecorat
         base.OnPlacementStarted(message);
     }
 
+    public override void OnPlacementCompleted(PlacementCompletedMessage message)
+    {
+        Write($"Ship placement completed for session {message.SessionId}.");
+        base.OnPlacementCompleted(message);
+    }
+
     public override void OnGameStarted(GameStartedMessage message)
     {
         Write($"Game started for session {message.SessionId}; you go first: {message.YouGoFirst}.");
@@ -41,6 +47,12 @@ public sealed class LoggingGameEventObserverDecorator : GameEventObserverDecorat
     {
         Write($"Shot result at {message.X},{message.Y}; hit: {message.IsHit}; obstacle: {message.IsObstacle}.");
         base.OnShotResult(message);
+    }
+
+    public override void OnShipMoved(ShipMovedMessage message)
+    {
+        Write($"A ship moved; it is now your turn: {message.IsYourTurnNext}.");
+        base.OnShipMoved(message);
     }
 
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message)

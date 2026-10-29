@@ -2,31 +2,29 @@ namespace BattleShip.Shared;
 
 public sealed class Level1Factory : LevelFactory
 {
-    public override IReadOnlyList<Obstacle> GetObstacles(BoardLayout boardLayout) => boardLayout switch
-    {
-        BoardLayout.PlayerA =>
-        [
-            new SmallObstacle(new GridPosition(1, 0)),
-            new SmallObstacle(new GridPosition(8, 3)),
-            new SmallObstacle(new GridPosition(3, 6)),
-            new SmallObstacle(new GridPosition(7, 9)),
-            new SmallObstacle(new GridPosition(2, 2))
-        ],
-        BoardLayout.PlayerB =>
-        [
-            new SmallObstacle(new GridPosition(8, 0)),
-            new SmallObstacle(new GridPosition(2, 3)),
-            new SmallObstacle(new GridPosition(6, 6)),
-            new SmallObstacle(new GridPosition(1, 9)),
-            new SmallObstacle(new GridPosition(7, 2))
-        ],
-        _ => throw new ArgumentOutOfRangeException(nameof(boardLayout), boardLayout, null)
-    };
+    public override string LevelId => "Level1";
 
-    public override IReadOnlyList<PowerUp> GetPowerUps(BoardLayout boardLayout) => boardLayout switch
-    {
-        BoardLayout.PlayerA => [new ExtraTurn(new GridPosition(4, 4))],
-        BoardLayout.PlayerB => [new ExtraTurn(new GridPosition(5, 5))],
-        _ => throw new ArgumentOutOfRangeException(nameof(boardLayout), boardLayout, null)
-    };
+    public override IReadOnlyList<Obstacle> GetObstacles(BoardLayout boardLayout) =>
+        PlaceObstacles(
+            boardLayout,
+            position => new SmallObstacle(position),
+            position => new SmallObstacle(position),
+            position => new SmallObstacle(position),
+            position => new SmallObstacle(position),
+            position => new WideObstacle(position, (WideObstacleOrientation)Random.Shared.Next(2)));
+
+    public override IReadOnlyList<PowerUp> GetPowerUps(BoardLayout boardLayout, GridModel grid) =>
+        PlacePowerUps(
+            boardLayout,
+            grid,
+            position => new ExtraTurn(position),
+            position => new FreeShot(position));
+
+    public override PowerUp CreatePowerUp(PowerUpType type, GridPosition position) =>
+        type switch
+        {
+            PowerUpType.ExtraTurn => new ExtraTurn(position),
+            PowerUpType.FreeShot => new FreeShot(position),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Power-up is not available in Level 1.")
+        };
 }

@@ -99,7 +99,18 @@ public class GameHub : Hub
 
         bool started;
         var placements = request.Ships ?? Array.Empty<ShipPlacement>();
-        if (!session.TrySubmitShipPlacement(Context.ConnectionId, placements, out started) || !started)
+        if (!session.TrySubmitShipPlacement(Context.ConnectionId, placements, out started))
+        {
+            return;
+        }
+
+        var placementCompleted = session.CreatePlacementCompletedMessage(Context.ConnectionId);
+        if (placementCompleted is not null)
+        {
+            await Clients.Client(Context.ConnectionId).SendAsync("PlacementCompleted", placementCompleted);
+        }
+
+        if (!started)
         {
             return;
         }
@@ -122,20 +133,40 @@ public class GameHub : Hub
         var lastIndex = outcomes.Count - 1;
         var shooterStrategies = session.GetAvailableShotStrategies(Context.ConnectionId).ToArray();
         var defenderStrategies = session.GetAvailableShotStrategies(opponentId).ToArray();
+        bool shooterKeepsTurn = session.IsPlayersTurn(Context.ConnectionId);
 
         for (int i = 0; i < outcomes.Count; i++)
         {
             var outcome = outcomes[i];
-            bool isYourTurnNext = i == lastIndex;
+            bool isLastOutcome = i == lastIndex;
 
             await Clients.Client(Context.ConnectionId)
                 .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle,
-                    IsYourTurnNext: false, AvailableShotStrategies: shooterStrategies));
+                    IsYourTurnNext: isLastOutcome && shooterKeepsTurn, AvailableShotStrategies: shooterStrategies,
+                    CollectedPowerUp: outcome.CollectedPowerUp));
 
             await Clients.Client(opponentId)
                 .SendAsync("ShotResult", new ShotResultMessage(Context.ConnectionId, outcome.X, outcome.Y, outcome.IsHit, outcome.IsObstacle,
-                    IsYourTurnNext: isYourTurnNext, AvailableShotStrategies: defenderStrategies));
+                    IsYourTurnNext: isLastOutcome && !shooterKeepsTurn, AvailableShotStrategies: defenderStrategies));
         }
+    }
+
+    public async Task<bool> MoveShip(MoveShipRequest request)
+    {
+        if (request is null ||
+            !SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) ||
+            session is null ||
+            !session.TryMoveShip(Context.ConnectionId, request))
+        {
+            return false;
+        }
+
+        var opponentId = session.OpponentOf(Context.ConnectionId);
+        await Clients.Client(Context.ConnectionId)
+            .SendAsync("ShipMoved", session.CreateShipMovedMessage(Context.ConnectionId, Context.ConnectionId));
+        await Clients.Client(opponentId)
+            .SendAsync("ShipMoved", session.CreateShipMovedMessage(opponentId, Context.ConnectionId));
+        return true;
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

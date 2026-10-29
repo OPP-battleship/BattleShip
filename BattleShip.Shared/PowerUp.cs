@@ -8,4 +8,8 @@ public abstract class PowerUp : BoardItem
     }
 
     public string Effect { get; }
+
+    public abstract void Collect(GridModel grid);
+
+    public abstract PowerUpType GetPowerUpType();
 }

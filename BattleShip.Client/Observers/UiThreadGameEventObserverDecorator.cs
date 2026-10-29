@@ -13,6 +13,9 @@ public sealed class UiThreadGameEventObserverDecorator(IGameEventObserver inner)
     public override void OnPlacementStarted(PlacementStartedMessage message) =>
         Dispatch(() => base.OnPlacementStarted(message));
 
+    public override void OnPlacementCompleted(PlacementCompletedMessage message) =>
+        Dispatch(() => base.OnPlacementCompleted(message));
+
     public override void OnGameStarted(GameStartedMessage message) =>
         Dispatch(() => base.OnGameStarted(message));
 
@@ -21,6 +24,9 @@ public sealed class UiThreadGameEventObserverDecorator(IGameEventObserver inner)
 
     public override void OnShotResult(ShotResultMessage message) =>
         Dispatch(() => base.OnShotResult(message));
+
+    public override void OnShipMoved(ShipMovedMessage message) =>
+        Dispatch(() => base.OnShipMoved(message));
 
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Dispatch(() => base.OnOpponentDisconnected(message));

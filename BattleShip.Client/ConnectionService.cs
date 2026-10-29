@@ -47,12 +47,16 @@ public class ConnectionService
 
         _connection.On<PlacementStartedMessage>("PlacementStarted", message =>
             Notify(observer => observer.OnPlacementStarted(message)));
+        _connection.On<PlacementCompletedMessage>("PlacementCompleted", message =>
+            Notify(observer => observer.OnPlacementCompleted(message)));
         _connection.On<GameStartedMessage>("GameStarted", message =>
             Notify(observer => observer.OnGameStarted(message)));
         _connection.On<GameResumedMessage>("GameResumed", message =>
             Notify(observer => observer.OnGameResumed(message)));
         _connection.On<ShotResultMessage>("ShotResult", message =>
             Notify(observer => observer.OnShotResult(message)));
+        _connection.On<ShipMovedMessage>("ShipMoved", message =>
+            Notify(observer => observer.OnShipMoved(message)));
         _connection.On<OpponentDisconnectedMessage>("OpponentDisconnected", message =>
             Notify(observer => observer.OnOpponentDisconnected(message)));
 
@@ -75,6 +79,12 @@ public class ConnectionService
     {
         if (_connection is null) throw new InvalidOperationException("Not connected yet.");
         return _connection.InvokeAsync("FireShot", new FireShotRequest(strategy, originX, originY, lineOrientation));
+    }
+
+    public Task<bool> MoveShipAsync(int fromX, int fromY, int deltaX, int deltaY)
+    {
+        if (_connection is null) throw new InvalidOperationException("Not connected yet.");
+        return _connection.InvokeAsync<bool>("MoveShip", new MoveShipRequest(fromX, fromY, deltaX, deltaY));
     }
 
     public Task<string> SaveGameAsync()

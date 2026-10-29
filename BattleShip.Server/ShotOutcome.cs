@@ -1,3 +1,5 @@
+using BattleShip.Shared;
+
 namespace BattleShip.Server;
 
-internal readonly record struct ShotOutcome(int X, int Y, bool IsHit, bool IsObstacle);
+internal readonly record struct ShotOutcome(int X, int Y, bool IsHit, bool IsObstacle, PowerUpType? CollectedPowerUp);
