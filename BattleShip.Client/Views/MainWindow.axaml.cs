@@ -262,6 +262,11 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         EnemyGrid.Children.Clear();
 
         _yourBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Player, board);
+        foreach (var placement in _shipPlacementClient.Placements)
+        {
+            _yourBoard.ApplyShipPlacement(placement);
+        }
+
         YourGrid.Children.Add(_yourBoard);
 
         var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
