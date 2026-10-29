@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System;
-using System.Collections.Generic;
 using BattleShip.Client.Observers;
 using BattleShip.Shared;
 
@@ -11,7 +10,8 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 {
     private const string ServerUrl = "http://localhost:5058";
 
-    private readonly ConnectionService _connection = new();
+    private readonly GameFacade _gameFacade = new(new ConnectionService());
+    private readonly ShipPlacementClient _shipPlacementClient;
     private readonly IGameEventObserver _gameEventObserver;
     private readonly ControlsPanel _controlsPanel;
     private readonly ShipPanel _shipPanel;
@@ -21,8 +21,6 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private BoardPanel? _placementBoard;
     private ScoreboardPanel? _scoreboard;
     private readonly PlacementCommandInvoker _placementCommands = new();
-    private readonly List<(int X, int Y)> _placementBlockedCells = [];
-    private readonly List<ShipPlacement> _shipPlacements = [];
     private CellState[]? _placementBoardState;
 
     private string? _myConnectionId;
@@ -32,6 +30,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     public MainWindow()
     {
         InitializeComponent();
+        _shipPlacementClient = new ShipPlacementClient(_gameFacade);
 
         _controlsPanel = (ControlsPanel)PanelFactory.Create(PanelFactory.Controls);
         ControlsGrid.Children.Add(_controlsPanel);
@@ -44,8 +43,8 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _gameEventObserver = new UiThreadGameEventObserverDecorator(
             new ExceptionHandlingGameEventObserverDecorator(
                 new LoggingGameEventObserverDecorator(this)));
-        _connection.Subscribe(_gameEventObserver);
-        Closed += (_, _) => _connection.Unsubscribe(_gameEventObserver);
+        _gameFacade.Subscribe(_gameEventObserver);
+        Closed += (_, _) => _gameFacade.Unsubscribe(_gameEventObserver);
     }
 
     private async void OnFindMatchClicked(object? sender, RoutedEventArgs e)
@@ -55,11 +54,11 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
         try
         {
-            await _connection.ConnectAsync(ServerUrl);
-            _myConnectionId = _connection.MyConnectionId;
+            await _gameFacade.ConnectAsync(ServerUrl);
+            _myConnectionId = _gameFacade.MyConnectionId;
 
             StatusText.Text = "Searching for an opponent...";
-            await _connection.FindMatchAsync();
+            await _gameFacade.FindMatchAsync();
         }
         catch (Exception ex)
         {
@@ -72,19 +71,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     {
         _sessionId = msg.SessionId;
         _placementBoardState = (CellState[])msg.Board.Clone();
-        _placementBlockedCells.Clear();
-        for (int y = 0; y < GridModel.Size; y++)
-        {
-            for (int x = 0; x < GridModel.Size; x++)
-            {
-                if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
-                {
-                    _placementBlockedCells.Add((x, y));
-                }
-            }
-        }
-
-        _shipPlacements.Clear();
+        _shipPlacementClient.BeginPlacement(msg.Board);
         _shipPanel.Reset();
         _placementCommands.Clear();
         RefreshPlacementBoard();
@@ -110,7 +97,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     public void OnGameResumed(GameResumedMessage msg)
     {
         _sessionId = msg.SessionId;
-        _myConnectionId = _connection.MyConnectionId;
+        _myConnectionId = _gameFacade.MyConnectionId;
         _isMyTurn = msg.IsYourTurn;
         BuildGrids(msg.YourBoard);
         BuildScoreboard();
@@ -164,8 +151,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         MenuPanel.IsVisible = true;
         FindMatchButton.IsEnabled = true;
         _sessionId = null;
-        _shipPlacements.Clear();
-        _placementBlockedCells.Clear();
+        _shipPlacementClient.Clear();
         _placementBoard = null;
         _placementBoardState = null;
         _placementCommands.Clear();
@@ -215,7 +201,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
         try
         {
-            await _connection.SubmitShipPlacementAsync(_sessionId, _shipPlacements);
+            await _gameFacade.SubmitShipPlacementAsync(_sessionId, _shipPlacementClient.Placements);
         }
         catch (Exception ex)
         {
@@ -226,35 +212,12 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     public bool CanPlaceShip(ShipPlacement placement, out string failureMessage)
     {
-        failureMessage = "";
-
-        if (_placementBoardState is null)
-        {
-            failureMessage = "Placement board is not ready yet.";
-            return false;
-        }
-
-        var tentativePlacements = new List<ShipPlacement>(_shipPlacements) { placement };
-        if (ShipPlacementRules.GetSpentPoints(tentativePlacements) > ShipCatalogue.PointBudget)
-        {
-            failureMessage = "That ship costs more points than you have remaining.";
-            return false;
-        }
-
-        var candidateGrid = new GridModel(_placementBlockedCells);
-
-        if (!candidateGrid.TryPlaceShips(tentativePlacements))
-        {
-            failureMessage = "That ship does not fit there. Check the board edges, obstacles, and spacing.";
-            return false;
-        }
-
-        return true;
+        return _shipPlacementClient.CanPlaceShip(placement, out failureMessage);
     }
 
     public void CommitPlacement(ShipPlacement placement)
     {
-        _shipPlacements.Add(placement);
+        _shipPlacementClient.CommitPlacement(placement);
         RefreshPlacementBoard();
         _shipPanel.MarkShipPlaced(placement.Type);
         PlacementStatusText.Text = _shipPanel.HasCompleteFleet
@@ -264,14 +227,14 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     public void RevertPlacement(ShipPlacement placement)
     {
-        if (!_shipPlacements.Remove(placement))
+        if (!_shipPlacementClient.RevertPlacement(placement))
         {
             return;
         }
 
         RefreshPlacementBoard();
         _shipPanel.MarkShipRemoved(placement.Type);
-        PlacementStatusText.Text = _shipPlacements.Count == 0
+        PlacementStatusText.Text = _shipPlacementClient.Placements.Count == 0
             ? $"Select ships and spend all {ShipCatalogue.PointBudget} points. Ships cannot touch."
             : "Last placement undone. Select another ship to continue.";
     }
@@ -284,7 +247,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         }
 
         _placementBoard = (BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Placement, _placementBoardState, OnPlacementCellClicked);
-        foreach (var placement in _shipPlacements)
+        foreach (var placement in _shipPlacementClient.Placements)
         {
             _placementBoard.ApplyShipPlacement(placement);
         }
@@ -321,7 +284,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         var lineOrientation = _controlsPanel.LineOrientationSelectedIndex == 1
             ? ShotOrientation.Vertical
             : ShotOrientation.Horizontal;
-        await _connection.FireShotAsync(_controlsPanel.SelectedShotStrategy, x, y, lineOrientation);
+        await _gameFacade.FireShotAsync(_controlsPanel.SelectedShotStrategy, x, y, lineOrientation);
     }
 
     private async void OnSaveGameClicked(object? sender, RoutedEventArgs e)
@@ -329,7 +292,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         SaveGameButton.IsEnabled = false;
         try
         {
-            var fileName = await _connection.SaveGameAsync();
+            var fileName = await _gameFacade.SaveGameAsync();
             SaveStatusText.Text = $"Game saved to saves/{fileName}";
         }
         catch (Exception ex)
