@@ -2,17 +2,17 @@ namespace BattleShip.Shared;
 
 public sealed class SpecialOperationsShipBuilder : ShipBuilder
 {
-    private bool _hasPressureDrive;
+    private bool _hasMovement;
 
-    public void InstallPressureDrive()
+    public void InstallMovement()
     {
-        if (_hasPressureDrive)
+        if (_hasMovement)
         {
-            throw new InvalidOperationException("The pressure drive is already installed.");
+            throw new InvalidOperationException("The movement capability is already installed.");
         }
 
         Product.ConfigureMovementCapability(new ShipMovementCapability(2, true));
-        _hasPressureDrive = true;
+        _hasMovement = true;
     }
 
     public override void BuildHullSection(IEnumerable<GridPosition> section)
@@ -35,9 +35,9 @@ public sealed class SpecialOperationsShipBuilder : ShipBuilder
 
     public override void SealHull()
     {
-        if (!_hasPressureDrive)
+        if (!_hasMovement)
         {
-            throw new InvalidOperationException("Install the pressure drive before sealing the submarine hull.");
+            throw new InvalidOperationException("Install the movement capability before sealing the submarine hull.");
         }
 
         base.SealHull();
@@ -46,6 +46,6 @@ public sealed class SpecialOperationsShipBuilder : ShipBuilder
     public override void Reset(Func<Ship> createProduct)
     {
         base.Reset(createProduct);
-        _hasPressureDrive = false;
+        _hasMovement = false;
     }
 }

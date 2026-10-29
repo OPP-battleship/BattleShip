@@ -22,6 +22,7 @@ internal sealed class ControlsPanel : Panel
         _lineOrientationComboBox = lineOrientationComboBox;
         _moveSubmarineButton = moveSubmarineButton;
         _moveSubmarineButton.IsVisible = false;
+        ToolTip.SetTip(_moveSubmarineButton, "Select a submarine cell on your board, then its destination.");
         _moveSubmarineButton.Click += (_, _) => MoveRequested?.Invoke();
     }
 

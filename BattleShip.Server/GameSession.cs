@@ -328,7 +328,8 @@ public class GameSession : IPrototype<GameSession>
                 ownGrid.ToUnfiredFlatArray(),
                 ownGrid.GetShotMarks().ToArray(),
                 enemyGrid.GetShotMarks().ToArray(),
-                HasSubmarine: ownGrid.HasShip(ShipType.Submarine));
+                HasSubmarine: ownGrid.HasShip(ShipType.Submarine),
+                SubmarineCells: ownGrid.GetShipCells(ShipType.Submarine));
         }
     }
 
@@ -354,7 +355,8 @@ public class GameSession : IPrototype<GameSession>
                 YouGoFirst: connectionId == PlayerAConnectionId,
                 GridOf(connectionId).ToFlatArray(),
                 GridOf(connectionId).GetAvailableShotStrategies().ToArray(),
-                HasSubmarine: GridOf(connectionId).HasShip(ShipType.Submarine));
+                HasSubmarine: GridOf(connectionId).HasShip(ShipType.Submarine),
+                SubmarineCells: GridOf(connectionId).GetShipCells(ShipType.Submarine));
         }
     }
 
@@ -368,7 +370,8 @@ public class GameSession : IPrototype<GameSession>
                 movingConnectionId,
                 IsYourTurnNext: receivingConnectionId == CurrentTurnConnectionId,
                 YourBoard: isMovingPlayer ? ownGrid.ToUnfiredFlatArray() : null,
-                YourShotsAtYou: isMovingPlayer ? ownGrid.GetShotMarks().ToArray() : null);
+                YourShotsAtYou: isMovingPlayer ? ownGrid.GetShotMarks().ToArray() : null,
+                SubmarineCells: isMovingPlayer ? ownGrid.GetShipCells(ShipType.Submarine) : null);
         }
     }
 

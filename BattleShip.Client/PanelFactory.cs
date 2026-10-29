@@ -154,14 +154,14 @@ public static class PanelFactory
         {
             Content = "Move Submarine",
             IsEnabled = false,
+            Width = 180,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom
         };
-
         var layout = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            Spacing = 12,
+            Spacing = 8,
             Children =
             {
                 new StackPanel

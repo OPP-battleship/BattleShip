@@ -220,6 +220,24 @@ public class GridModel : IPrototype<GridModel>
     public bool HasShip(ShipType type) =>
         _placedShips.Any(placedShip => placedShip.Ship.Type == type);
 
+    public GridPosition[] GetShipCells(ShipType type)
+    {
+        var cells = new List<GridPosition>();
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                int owner = _shipOwners[x, y];
+                if (owner >= 0 && _placedShips[owner].Ship.Type == type)
+                {
+                    cells.Add(new GridPosition(x, y));
+                }
+            }
+        }
+
+        return cells.ToArray();
+    }
+
     public bool TryPlaceShips(IReadOnlyList<ShipPlacement>? placements)
     {
         if (placements is null || placements.Count == 0 || _placedShips.Count > 0)
