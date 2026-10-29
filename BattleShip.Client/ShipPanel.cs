@@ -132,27 +132,12 @@ internal sealed class ShipPanel : Panel
     {
         foreach (var (type, button) in _shipButtons)
         {
-<<<<<<< Updated upstream
-            var ship = ShipCatalogue.Create(type);
-            int count = _shipCounts.GetValueOrDefault(type);
-            bool isSelected = SelectedShipType == type;
-            string strategyName = ship.UnlockedStrategy switch
-            {
-                ShotStrategyType.Line => "Line Shot",
-                ShotStrategyType.Spread => "Spread Shot",
-                ShotStrategyType.Ring => "Ring Shot",
-                _ => "No special shot"
-            };
-            button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({ship.PointCost} AP; {strategyName}, placed {count})";
-            button.Background = isSelected ? Brushes.LightBlue : Brushes.Transparent;
-=======
-            var view = new ShipButtonView(
-                ShipCatalogue.Create(type),
-                _shipCounts.GetValueOrDefault(type),
-                SelectedShipType == type);
             button.Content = view.Label;
             button.Background = view.Fill;
->>>>>>> Stashed changes
+=======
+            button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({view.PointCost} AP; {strategyName}, placed {count})";
+            button.Background = view.Fill;
+>>>>>>> Bridge
             button.IsEnabled = CanPlaceShip(type);
         }
 

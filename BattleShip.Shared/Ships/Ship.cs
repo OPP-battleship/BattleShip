@@ -1,6 +1,6 @@
 namespace BattleShip.Shared;
 
-public abstract class Ship
+public abstract class Ship : IShipBackend
 {
     public abstract ShipType Type { get; }
     public int PointCost { get; private set; }
