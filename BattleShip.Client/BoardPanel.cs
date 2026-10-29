@@ -45,11 +45,16 @@ internal sealed class BoardPanel : Panel
 
     public void ApplyShipPlacement(ShipPlacement placement)
     {
-        foreach (var offset in ShipCatalogue.Create(placement.Type).GetOffsets(placement.Orientation))
+        var view = new PlacedShipView(
+            ShipCatalogue.Create(placement.Type),
+            new GridPosition(placement.X, placement.Y),
+            placement.Orientation);
+
+        foreach (var position in view.Cells)
         {
-            var cell = _cells[placement.X + offset.X, placement.Y + offset.Y];
-            cell.Content = "X";
-            cell.Background = Brushes.SteelBlue;
+            var cell = _cells[position.X, position.Y];
+            cell.Content = view.Marker;
+            cell.Background = view.Fill;
             cell.IsEnabled = false;
         }
     }

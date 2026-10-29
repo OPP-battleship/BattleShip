@@ -132,6 +132,7 @@ internal sealed class ShipPanel : Panel
     {
         foreach (var (type, button) in _shipButtons)
         {
+<<<<<<< Updated upstream
             var ship = ShipCatalogue.Create(type);
             int count = _shipCounts.GetValueOrDefault(type);
             bool isSelected = SelectedShipType == type;
@@ -144,6 +145,14 @@ internal sealed class ShipPanel : Panel
             };
             button.Content = $"{(isSelected ? "> " : string.Empty)}{ShipCatalogue.GetDisplayName(type)} ({ship.PointCost} AP; {strategyName}, placed {count})";
             button.Background = isSelected ? Brushes.LightBlue : Brushes.Transparent;
+=======
+            var view = new ShipButtonView(
+                ShipCatalogue.Create(type),
+                _shipCounts.GetValueOrDefault(type),
+                SelectedShipType == type);
+            button.Content = view.Label;
+            button.Background = view.Fill;
+>>>>>>> Stashed changes
             button.IsEnabled = CanPlaceShip(type);
         }
 
