@@ -18,4 +18,12 @@ public sealed class Level2Factory : LevelFactory
             position => new ShotAreaUp(position),
             position => new ShotAreaUp(position),
             position => new FreeShot(position));
+
+    public override PowerUp CreatePowerUp(PowerUpType type, GridPosition position) =>
+        type switch
+        {
+            PowerUpType.ShotAreaUp => new ShotAreaUp(position),
+            PowerUpType.FreeShot => new FreeShot(position),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Power-up is not available in Level 2.")
+        };
 }

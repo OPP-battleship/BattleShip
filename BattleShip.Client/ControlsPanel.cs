@@ -21,6 +21,7 @@ internal sealed class ControlsPanel : Panel
         _shotModeComboBox = shotModeComboBox;
         _lineOrientationComboBox = lineOrientationComboBox;
         _moveSubmarineButton = moveSubmarineButton;
+        _moveSubmarineButton.IsVisible = false;
         _moveSubmarineButton.Click += (_, _) => MoveRequested?.Invoke();
     }
 
@@ -30,8 +31,9 @@ internal sealed class ControlsPanel : Panel
 
     public int LineOrientationSelectedIndex => _lineOrientationComboBox.SelectedIndex;
 
-    public void SetMoveButton(bool isEnabled, bool isMoveMode)
+    public void SetMoveButton(bool isVisible, bool isEnabled, bool isMoveMode)
     {
+        _moveSubmarineButton.IsVisible = isVisible;
         _moveSubmarineButton.IsEnabled = isEnabled;
         _moveSubmarineButton.Content = isMoveMode ? "Cancel Move" : "Move Submarine";
     }

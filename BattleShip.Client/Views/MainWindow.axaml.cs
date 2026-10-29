@@ -30,6 +30,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private bool _isMyTurn;
     private bool _isMoveMode;
     private bool _movePending;
+    private bool _hasSubmarine;
 
     public MainWindow()
     {
@@ -118,6 +119,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _isMoveMode = false;
         _moveOrigin = null;
         _movePending = false;
+        _hasSubmarine = msg.HasSubmarine;
         _isMyTurn = msg.YouGoFirst;
         _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         BuildGrids(msg.YourBoard);
@@ -132,6 +134,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _isMoveMode = false;
         _moveOrigin = null;
         _movePending = false;
+        _hasSubmarine = msg.HasSubmarine;
         _sessionId = msg.SessionId;
         _myConnectionId = _gameFacade.MyConnectionId;
         _isMyTurn = msg.IsYourTurn;
@@ -215,6 +218,11 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         MenuPanel.IsVisible = true;
         FindMatchButton.IsEnabled = true;
         _sessionId = null;
+        _hasSubmarine = false;
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
+        _controlsPanel.SetMoveButton(false, false, false);
         _shipPlacementClient.Clear();
         _placementBoard = null;
         _placementBoardState = null;
@@ -423,7 +431,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     private void OnMoveRequested()
     {
-        if (!_isMyTurn || _movePending)
+        if (!_hasSubmarine || !_isMyTurn || _movePending)
         {
             return;
         }
@@ -468,7 +476,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
                 _movePending = false;
                 _moveOrigin = null;
                 TurnText.Text = "Move rejected. Choose an undamaged submarine and a legal destination.";
-                _controlsPanel.SetMoveButton(_isMyTurn, _isMoveMode);
+                _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
             }
         }
         catch (Exception ex)
@@ -476,7 +484,7 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             _movePending = false;
             _moveOrigin = null;
             TurnText.Text = $"Could not move ship: {ex.Message}";
-            _controlsPanel.SetMoveButton(_isMyTurn, _isMoveMode);
+            _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
         }
     }
 
@@ -508,6 +516,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             : _latestPowerUpNotice is null
             ? turn
             : $"{turn} — {_latestPowerUpNotice}";
-        _controlsPanel.SetMoveButton(_isMyTurn && !_movePending, _isMoveMode);
+        _controlsPanel.SetMoveButton(
+            _hasSubmarine,
+            _isMyTurn && !_movePending,
+            _isMoveMode);
     }
 }
