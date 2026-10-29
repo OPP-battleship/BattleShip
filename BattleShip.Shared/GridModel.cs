@@ -40,7 +40,8 @@ public class GridModel : IPrototype<GridModel>
         int shotAreaUpCount = 0,
         int extraTurnCount = 0,
         int freeShotCount = 0,
-        IReadOnlyList<GridShipSnapshot>? ships = null)
+        IReadOnlyList<GridShipSnapshot>? ships = null,
+        Func<PowerUpType, GridPosition, PowerUp>? createPowerUp = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         if (cells.Count != Size * Size)
@@ -86,7 +87,12 @@ public class GridModel : IPrototype<GridModel>
                         throw new ArgumentOutOfRangeException(nameof(powerUpCodes), type, "Unknown power-up type.");
                     }
 
-                    grid._powerUps[x, y] = PowerUpAdapter.Create(type, new GridPosition(x, y));
+                    if (createPowerUp is null)
+                    {
+                        throw new InvalidOperationException("A level power-up factory is required to restore power-ups.");
+                    }
+
+                    grid._powerUps[x, y] = createPowerUp(type, new GridPosition(x, y));
                 }
             }
         }
@@ -210,6 +216,9 @@ public class GridModel : IPrototype<GridModel>
     public static bool IsInsideBounds(int x, int y) => x >= 0 && x < Size && y >= 0 && y < Size;
 
     public CellState GetCell(int x, int y) => _cells[x, y];
+
+    public bool HasShip(ShipType type) =>
+        _placedShips.Any(placedShip => placedShip.Ship.Type == type);
 
     public bool TryPlaceShips(IReadOnlyList<ShipPlacement>? placements)
     {
@@ -539,7 +548,7 @@ public class GridModel : IPrototype<GridModel>
             {
                 if (_powerUps[x, y] is { } powerUp)
                 {
-                    codes[y * Size + x] = (int)PowerUpAdapter.GetPowerUpType(powerUp);
+                    codes[y * Size + x] = (int)powerUp.GetPowerUpType();
                 }
             }
         }

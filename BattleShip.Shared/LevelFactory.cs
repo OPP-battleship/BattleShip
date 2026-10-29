@@ -5,6 +5,7 @@ public abstract class LevelFactory
     public abstract string LevelId { get; }
     public abstract IReadOnlyList<Obstacle> GetObstacles(BoardLayout boardLayout);
     public abstract IReadOnlyList<PowerUp> GetPowerUps(BoardLayout boardLayout, GridModel grid);
+    public abstract PowerUp CreatePowerUp(PowerUpType type, GridPosition position);
 
     protected static IReadOnlyList<Obstacle> PlaceObstacles(
         BoardLayout boardLayout,

@@ -68,7 +68,8 @@ public class GameSession : IPrototype<GameSession>
             snapshot.ShotAreaUpA,
             snapshot.ExtraTurnsA,
             snapshot.FreeShotsA,
-            snapshot.ShipsA);
+            snapshot.ShipsA,
+            _levelFactory.CreatePowerUp);
         GridB = GridModel.FromFlatArray(
             snapshot.GridB.Select(c => (CellState)c).ToArray(),
             snapshot.ShotsB.Length == 0 ? null : snapshot.ShotsB,
@@ -76,7 +77,8 @@ public class GameSession : IPrototype<GameSession>
             snapshot.ShotAreaUpB,
             snapshot.ExtraTurnsB,
             snapshot.FreeShotsB,
-            snapshot.ShipsB);
+            snapshot.ShipsB,
+            _levelFactory.CreatePowerUp);
         CurrentTurnConnectionId = snapshot.IsPlayerATurn ? playerA : playerB;
         _playerAReady = snapshot.PlayerAReady;
         _playerBReady = snapshot.PlayerBReady;
@@ -199,7 +201,7 @@ public class GameSession : IPrototype<GameSession>
                 if (powerUp is not null)
                 {
                     new PowerUpAdapter(powerUp).ApplyTo(shooterGrid);
-                    collectedPowerUp = PowerUpAdapter.GetPowerUpType(powerUp);
+                    collectedPowerUp = powerUp.GetPowerUpType();
                 }
 
                 results.Add(new ShotOutcome(target.X, target.Y, isHit, isObstacle, collectedPowerUp));
@@ -325,7 +327,8 @@ public class GameSession : IPrototype<GameSession>
                 IsYourTurn: connectionId == CurrentTurnConnectionId,
                 ownGrid.ToUnfiredFlatArray(),
                 ownGrid.GetShotMarks().ToArray(),
-                enemyGrid.GetShotMarks().ToArray());
+                enemyGrid.GetShotMarks().ToArray(),
+                HasSubmarine: ownGrid.HasShip(ShipType.Submarine));
         }
     }
 
@@ -350,7 +353,8 @@ public class GameSession : IPrototype<GameSession>
                 SessionId,
                 YouGoFirst: connectionId == PlayerAConnectionId,
                 GridOf(connectionId).ToFlatArray(),
-                GridOf(connectionId).GetAvailableShotStrategies().ToArray());
+                GridOf(connectionId).GetAvailableShotStrategies().ToArray(),
+                HasSubmarine: GridOf(connectionId).HasShip(ShipType.Submarine));
         }
     }
 
