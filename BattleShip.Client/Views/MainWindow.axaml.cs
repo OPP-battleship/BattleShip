@@ -113,6 +113,30 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         PlacementStatusText.Text = "Ships placed. Power-ups have appeared. Waiting for your opponent...";
     }
 
+    public void OnPlacementCompleted(PlacementCompletedMessage msg)
+    {
+        if (msg.SessionId != _sessionId || _placementBoardState is null)
+        {
+            return;
+        }
+
+        _placementBoardState = (CellState[])msg.Board.Clone();
+        _placementBlockedCells.Clear();
+        for (int y = 0; y < GridModel.Size; y++)
+        {
+            for (int x = 0; x < GridModel.Size; x++)
+            {
+                if (msg.Board[y * GridModel.Size + x] is CellState.Obstacle or CellState.PowerUp)
+                {
+                    _placementBlockedCells.Add((x, y));
+                }
+            }
+        }
+
+        RefreshPlacementBoard();
+        PlacementStatusText.Text = "Ships placed. Power-ups have appeared. Waiting for your opponent...";
+    }
+
     public void OnGameStarted(GameStartedMessage msg)
     {
         _latestPowerUpNotice = null;
@@ -235,7 +259,8 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _moveOrigin = null;
         _movePending = false;
         _controlsPanel.SetMoveButton(false, false, false);
-        _shipPlacementClient.Clear();
+        _shipPlacements.Clear();
+        _placementBlockedCells.Clear();
         _placementBoard = null;
         _placementBoardState = null;
         _placementCommands.Clear();
@@ -440,6 +465,90 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             TurnText.Text = $"Could not move ship: {ex.Message}";
             _controlsPanel.SetMoveButton(_isMyTurn, _isMoveMode);
         }
+    }
+
+    private void OnMoveRequested()
+    {
+        if (!_hasSubmarine || !_isMyTurn || _movePending)
+        {
+            return;
+        }
+
+        _isMoveMode = !_isMoveMode;
+        _moveOrigin = null;
+        _yourBoard?.SetSelectedMoveCell(null);
+        MoveHintText.IsVisible = _isMoveMode;
+        MoveHintText.Text = _isMoveMode
+            ? "Move mode: click a cell marked S to select your submarine."
+            : "Click a cell marked S to select your submarine, then a straight-line destination up to 2 cells away. Moving uses your turn.";
+        UpdateTurnText();
+    }
+
+    private async void OnYourCellClicked(int x, int y)
+    {
+        if (!_isMyTurn || !_isMoveMode || _movePending)
+        {
+            return;
+        }
+
+        var clicked = new GridPosition(x, y);
+        if (_moveOrigin is null)
+        {
+            if (_yourBoard?.IsSubmarineCell(x, y) != true)
+            {
+                MoveHintText.Text = "That is not your submarine. Select a cell marked S on your board.";
+                return;
+            }
+
+            _moveOrigin = clicked;
+            _yourBoard?.SetSelectedMoveCell(clicked);
+            MoveHintText.Text = "Submarine selected. Click a destination in a straight line, 1 or 2 cells away.";
+            return;
+        }
+
+        var origin = _moveOrigin.Value;
+        int deltaX = x - origin.X;
+        int deltaY = y - origin.Y;
+        int distance = Math.Abs(deltaX) + Math.Abs(deltaY);
+        if ((deltaX == 0 && deltaY == 0) ||
+            (deltaX != 0 && deltaY != 0) ||
+            distance > 2)
+        {
+            MoveHintText.Text = "Invalid destination. Select a different cell in a straight line, up to 2 cells away.";
+            return;
+        }
+
+        _movePending = true;
+        UpdateTurnText();
+        try
+        {
+            bool moved = await _connection.MoveShipAsync(origin.X, origin.Y, deltaX, deltaY);
+            if (!moved)
+            {
+                _movePending = false;
+                _moveOrigin = null;
+                _yourBoard?.SetSelectedMoveCell(null);
+                MoveHintText.Text = "Move rejected. Choose an undamaged submarine and a legal destination.";
+                _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _movePending = false;
+            _moveOrigin = null;
+            _yourBoard?.SetSelectedMoveCell(null);
+            MoveHintText.Text = $"Could not move ship: {ex.Message}";
+            _controlsPanel.SetMoveButton(_hasSubmarine, _isMyTurn && !_movePending, _isMoveMode);
+        }
+    }
+
+    private void CancelMoveMode()
+    {
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
+        MoveHintText.IsVisible = false;
+        _yourBoard?.SetSelectedMoveCell(null);
     }
 
     private void OnMoveRequested()

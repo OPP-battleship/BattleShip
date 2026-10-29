@@ -3,6 +3,7 @@ using Avalonia.Media;
 using BattleShip.Shared;
 using System;
 using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace BattleShip.Client;
 
@@ -10,6 +11,7 @@ internal sealed class BoardPanel : Panel
 {
     private readonly Button[,] _cells;
     private readonly bool[,] _fired;
+    private readonly HashSet<GridPosition> _submarineCells = [];
     private readonly HashSet<GridPosition> _submarineCells = [];
 
     public event Action<int, int>? CellClicked;
@@ -91,11 +93,11 @@ internal sealed class BoardPanel : Panel
 
         foreach (var position in view.Cells)
         {
-            var cell = _cells[position.X, position.Y];
-            cell.Content = placement.Type == ShipType.Submarine ? "S" : view.Marker;
+            var cell = _cells[placement.X + offset.X, placement.Y + offset.Y];
+            cell.Content = placement.Type == ShipType.Submarine ? "S" : "X";
             cell.Background = placement.Type == ShipType.Submarine
                 ? Brushes.DarkSlateBlue
-                : view.Fill;
+                : Brushes.SteelBlue;
             cell.IsEnabled = false;
         }
     }
