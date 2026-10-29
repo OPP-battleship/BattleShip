@@ -67,14 +67,16 @@ public class GameSession : IPrototype<GameSession>
             snapshot.PowerUpsA.Length == 0 ? null : snapshot.PowerUpsA,
             snapshot.ShotAreaUpA,
             snapshot.ExtraTurnsA,
-            snapshot.FreeShotsA);
+            snapshot.FreeShotsA,
+            snapshot.ShipsA);
         GridB = GridModel.FromFlatArray(
             snapshot.GridB.Select(c => (CellState)c).ToArray(),
             snapshot.ShotsB.Length == 0 ? null : snapshot.ShotsB,
             snapshot.PowerUpsB.Length == 0 ? null : snapshot.PowerUpsB,
             snapshot.ShotAreaUpB,
             snapshot.ExtraTurnsB,
-            snapshot.FreeShotsB);
+            snapshot.FreeShotsB,
+            snapshot.ShipsB);
         CurrentTurnConnectionId = snapshot.IsPlayerATurn ? playerA : playerB;
         _playerAReady = snapshot.PlayerAReady;
         _playerBReady = snapshot.PlayerBReady;
@@ -104,6 +106,8 @@ public class GameSession : IPrototype<GameSession>
                 LevelId = _levelFactory.LevelId,
                 GridA = GridA.ToFlatArray().Select(c => (int)c).ToArray(),
                 GridB = GridB.ToFlatArray().Select(c => (int)c).ToArray(),
+                ShipsA = GridA.GetShipSnapshots(),
+                ShipsB = GridB.GetShipSnapshots(),
                 ShotsA = GridA.ToShotCodes(),
                 ShotsB = GridB.ToShotCodes(),
                 PowerUpsA = GridA.ToPowerUpCodes(),
@@ -221,6 +225,26 @@ public class GameSession : IPrototype<GameSession>
         }
     }
 
+    internal bool TryMoveShip(string movingConnectionId, MoveShipRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        lock (_lock)
+        {
+            if (!_isGameStarted ||
+                movingConnectionId != CurrentTurnConnectionId ||
+                (movingConnectionId != PlayerAConnectionId && movingConnectionId != PlayerBConnectionId) ||
+                !GridOf(movingConnectionId).TryMoveShip(
+                    request.FromX, request.FromY, request.DeltaX, request.DeltaY))
+            {
+                return false;
+            }
+
+            CurrentTurnConnectionId = OpponentOf(movingConnectionId);
+            return true;
+        }
+    }
+
     internal bool TrySubmitShipPlacement(string connectionId, IReadOnlyList<ShipPlacement>? placements, out bool gameStarted)
     {
         gameStarted = false;
@@ -327,6 +351,20 @@ public class GameSession : IPrototype<GameSession>
                 YouGoFirst: connectionId == PlayerAConnectionId,
                 GridOf(connectionId).ToFlatArray(),
                 GridOf(connectionId).GetAvailableShotStrategies().ToArray());
+        }
+    }
+
+    internal ShipMovedMessage CreateShipMovedMessage(string receivingConnectionId, string movingConnectionId)
+    {
+        lock (_lock)
+        {
+            bool isMovingPlayer = receivingConnectionId == movingConnectionId;
+            var ownGrid = GridOf(receivingConnectionId);
+            return new ShipMovedMessage(
+                movingConnectionId,
+                IsYourTurnNext: receivingConnectionId == CurrentTurnConnectionId,
+                YourBoard: isMovingPlayer ? ownGrid.ToUnfiredFlatArray() : null,
+                YourShotsAtYou: isMovingPlayer ? ownGrid.GetShotMarks().ToArray() : null);
         }
     }
 

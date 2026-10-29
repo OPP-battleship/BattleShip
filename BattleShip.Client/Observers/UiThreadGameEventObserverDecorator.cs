@@ -25,6 +25,9 @@ public sealed class UiThreadGameEventObserverDecorator(IGameEventObserver inner)
     public override void OnShotResult(ShotResultMessage message) =>
         Dispatch(() => base.OnShotResult(message));
 
+    public override void OnShipMoved(ShipMovedMessage message) =>
+        Dispatch(() => base.OnShipMoved(message));
+
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Dispatch(() => base.OnOpponentDisconnected(message));
 

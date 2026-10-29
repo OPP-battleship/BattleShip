@@ -151,6 +151,24 @@ public class GameHub : Hub
         }
     }
 
+    public async Task<bool> MoveShip(MoveShipRequest request)
+    {
+        if (request is null ||
+            !SessionManager.Instance.TryGetSession(Context.ConnectionId, out var session) ||
+            session is null ||
+            !session.TryMoveShip(Context.ConnectionId, request))
+        {
+            return false;
+        }
+
+        var opponentId = session.OpponentOf(Context.ConnectionId);
+        await Clients.Client(Context.ConnectionId)
+            .SendAsync("ShipMoved", session.CreateShipMovedMessage(Context.ConnectionId, Context.ConnectionId));
+        await Clients.Client(opponentId)
+            .SendAsync("ShipMoved", session.CreateShipMovedMessage(opponentId, Context.ConnectionId));
+        return true;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (SessionManager.Instance.TryRemoveSession(Context.ConnectionId, out var session) && session is not null)

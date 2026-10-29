@@ -10,18 +10,18 @@ public static class ShipCatalogue
 
     public static Ship Create(ShipType type)
     {
-        IShipBuilder builder = type switch
+        Func<Ship> createProduct = type switch
         {
-            ShipType.AircraftCarrier => new AircraftCarrierBuilder(),
-            ShipType.Submarine => new SubmarineBuilder(),
-            ShipType.Cruiser => new CruiserBuilder(),
-            ShipType.PatrolBoat => new PatrolBoatBuilder(),
-            ShipType.Destroyer => new DestroyerBuilder(),
-            ShipType.Flagship => new FlagshipBuilder(),
+            ShipType.AircraftCarrier => static () => new AircraftCarrier(),
+            ShipType.Submarine => static () => new Submarine(),
+            ShipType.Cruiser => static () => new Cruiser(),
+            ShipType.PatrolBoat => static () => new PatrolBoat(),
+            ShipType.Destroyer => static () => new Destroyer(),
+            ShipType.Flagship => static () => new Flagship(),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown ship type.")
         };
 
-        return Director.ConstructShip(builder);
+        return Director.ConstructShip(type, createProduct);
     }
 
     public static string GetDisplayName(ShipType type) => type switch

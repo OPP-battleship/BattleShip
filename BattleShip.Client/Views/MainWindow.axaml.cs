@@ -28,13 +28,17 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private string? _myConnectionId;
     private string? _sessionId;
     private string? _latestPowerUpNotice;
+    private GridPosition? _moveOrigin;
     private bool _isMyTurn;
+    private bool _isMoveMode;
+    private bool _movePending;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _controlsPanel = (ControlsPanel)PanelFactory.Create(PanelFactory.Controls);
+        _controlsPanel.MoveRequested += OnMoveRequested;
         ControlsGrid.Children.Add(_controlsPanel);
 
         _shipPanel = (ShipPanel)PanelFactory.Create(PanelFactory.Ships);
@@ -124,6 +128,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     public void OnGameStarted(GameStartedMessage msg)
     {
         _latestPowerUpNotice = null;
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
         _isMyTurn = msg.YouGoFirst;
         _controlsPanel.SetAvailableShotStrategies(msg.AvailableShotStrategies);
         BuildGrids(msg.YourBoard);
@@ -135,6 +142,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
 
     public void OnGameResumed(GameResumedMessage msg)
     {
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
         _sessionId = msg.SessionId;
         _myConnectionId = _connection.MyConnectionId;
         _isMyTurn = msg.IsYourTurn;
@@ -192,6 +202,24 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         UpdateTurnText();
     }
 
+    public void OnShipMoved(ShipMovedMessage msg)
+    {
+        if (msg.YourBoard is { } board)
+        {
+            BuildYourBoard(board);
+            foreach (var shot in msg.YourShotsAtYou ?? [])
+            {
+                _yourBoard?.ApplyShot(shot.X, shot.Y, shot.IsHit, shot.IsObstacle);
+            }
+        }
+
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
+        _isMyTurn = msg.IsYourTurnNext;
+        UpdateTurnText();
+    }
+
     public void OnOpponentDisconnected(OpponentDisconnectedMessage msg)
     {
         StatusText.Text = "Opponent disconnected.";
@@ -208,6 +236,9 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         _shipPanel.Reset();
         _shipPanel.SetUndoEnabled(false);
         _latestPowerUpNotice = null;
+        _isMoveMode = false;
+        _moveOrigin = null;
+        _movePending = false;
     }
 
     private void OnPlacementCellClicked(int x, int y)
@@ -335,13 +366,20 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
         YourGrid.Children.Clear();
         EnemyGrid.Children.Clear();
 
-        _yourBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Player, board);
-        YourGrid.Children.Add(_yourBoard);
+        BuildYourBoard(board);
 
         var hiddenEnemyBoard = new CellState[GridModel.Size * GridModel.Size];
         _enemyBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(PanelFactory.Board, BoardCellOwner.Enemy, hiddenEnemyBoard,
             OnEnemyCellClicked);
         EnemyGrid.Children.Add(_enemyBoard);
+    }
+
+    private void BuildYourBoard(CellState[] board)
+    {
+        YourGrid.Children.Clear();
+        _yourBoard = (BattleShip.Client.BoardPanel)PanelFactory.Create(
+            PanelFactory.Board, BoardCellOwner.Player, board, OnYourCellClicked);
+        YourGrid.Children.Add(_yourBoard);
     }
 
     private void BuildScoreboard()
@@ -359,6 +397,65 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
             ? ShotOrientation.Vertical
             : ShotOrientation.Horizontal;
         await _connection.FireShotAsync(_controlsPanel.SelectedShotStrategy, x, y, lineOrientation);
+    }
+
+    private void OnMoveRequested()
+    {
+        if (!_isMyTurn || _movePending)
+        {
+            return;
+        }
+
+        _isMoveMode = !_isMoveMode;
+        _moveOrigin = null;
+        UpdateTurnText();
+    }
+
+    private async void OnYourCellClicked(int x, int y)
+    {
+        if (!_isMyTurn || !_isMoveMode || _movePending)
+        {
+            return;
+        }
+
+        var clicked = new GridPosition(x, y);
+        if (_moveOrigin is null)
+        {
+            _moveOrigin = clicked;
+            TurnText.Text = "Select the submarine's destination cell.";
+            return;
+        }
+
+        var origin = _moveOrigin.Value;
+        int deltaX = x - origin.X;
+        int deltaY = y - origin.Y;
+        if ((deltaX == 0 && deltaY == 0) || (deltaX != 0 && deltaY != 0))
+        {
+            _moveOrigin = clicked;
+            TurnText.Text = "Select a straight-line destination, up to two cells away.";
+            return;
+        }
+
+        _movePending = true;
+        UpdateTurnText();
+        try
+        {
+            bool moved = await _connection.MoveShipAsync(origin.X, origin.Y, deltaX, deltaY);
+            if (!moved)
+            {
+                _movePending = false;
+                _moveOrigin = null;
+                TurnText.Text = "Move rejected. Choose an undamaged submarine and a legal destination.";
+                _controlsPanel.SetMoveButton(_isMyTurn, _isMoveMode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _movePending = false;
+            _moveOrigin = null;
+            TurnText.Text = $"Could not move ship: {ex.Message}";
+            _controlsPanel.SetMoveButton(_isMyTurn, _isMoveMode);
+        }
     }
 
     private async void OnSaveGameClicked(object? sender, RoutedEventArgs e)
@@ -382,8 +479,13 @@ public partial class MainWindow : Window, IGameEventObserver, IPlacementCommandR
     private void UpdateTurnText()
     {
         var turn = _isMyTurn ? "Your turn" : "Opponent's turn";
-        TurnText.Text = _latestPowerUpNotice is null
+        TurnText.Text = _isMoveMode
+            ? _moveOrigin is null
+                ? "Select an undamaged submarine cell to move."
+                : "Select the submarine's destination cell."
+            : _latestPowerUpNotice is null
             ? turn
             : $"{turn} — {_latestPowerUpNotice}";
+        _controlsPanel.SetMoveButton(_isMyTurn && !_movePending, _isMoveMode);
     }
 }
