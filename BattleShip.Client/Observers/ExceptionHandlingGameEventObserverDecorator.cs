@@ -35,6 +35,9 @@ public sealed class ExceptionHandlingGameEventObserverDecorator : GameEventObser
     public override void OnShotResult(ShotResultMessage message) =>
         Execute(nameof(OnShotResult), () => base.OnShotResult(message));
 
+    public override void OnShipMoved(ShipMovedMessage message) =>
+        Execute(nameof(OnShipMoved), () => base.OnShipMoved(message));
+
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Execute(nameof(OnOpponentDisconnected), () => base.OnOpponentDisconnected(message));
 

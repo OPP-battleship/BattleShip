@@ -49,6 +49,12 @@ public sealed class LoggingGameEventObserverDecorator : GameEventObserverDecorat
         base.OnShotResult(message);
     }
 
+    public override void OnShipMoved(ShipMovedMessage message)
+    {
+        Write($"A ship moved; it is now your turn: {message.IsYourTurnNext}.");
+        base.OnShipMoved(message);
+    }
+
     public override void OnOpponentDisconnected(OpponentDisconnectedMessage message)
     {
         Write($"Opponent disconnected from session {message.SessionId}.");

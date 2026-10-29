@@ -58,7 +58,7 @@ public static class PanelFactory
         {
             for (int x = 0; x < GridModel.Size; x++)
             {
-                var cell = CreateCell(owner, board[y * GridModel.Size + x]);
+                var cell = CreateCell(owner, board[y * GridModel.Size + x], cellClicked is not null);
                 cells[x, y] = cell;
                 grid.Children.Add(cell);
             }
@@ -74,7 +74,7 @@ public static class PanelFactory
         return panel;
     }
 
-    private static Button CreateCell(BoardCellOwner owner, CellState state)
+    private static Button CreateCell(BoardCellOwner owner, CellState state, bool isInteractive)
     {
         var button = new Button
         {
@@ -97,7 +97,7 @@ public static class PanelFactory
                     CellState.PowerUp => Brushes.Gold,
                     _ => Brushes.Gray
                 };
-                button.IsHitTestVisible = false;
+                button.IsHitTestVisible = isInteractive;
                 break;
             case BoardCellOwner.Enemy:
                 button.Background = Brushes.Gray;
@@ -150,6 +150,12 @@ public static class PanelFactory
                 new ComboBoxItem { Content = "Vertical" },
             },
         };
+        var moveSubmarineButton = new Button
+        {
+            Content = "Move Submarine",
+            IsEnabled = false,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom
+        };
 
         var layout = new StackPanel
         {
@@ -176,10 +182,11 @@ public static class PanelFactory
                         lineOrientationComboBox,
                     },
                 },
+                moveSubmarineButton,
             },
         };
 
-        return new ControlsPanel(layout, shotModeComboBox, lineOrientationComboBox);
+        return new ControlsPanel(layout, shotModeComboBox, lineOrientationComboBox, moveSubmarineButton);
     }
 
     private static ScoreboardPanel CreateScoreboardPanel()

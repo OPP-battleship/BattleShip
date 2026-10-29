@@ -39,7 +39,8 @@ public class GridModel : IPrototype<GridModel>
         IReadOnlyList<int>? powerUpCodes = null,
         int shotAreaUpCount = 0,
         int extraTurnCount = 0,
-        int freeShotCount = 0)
+        int freeShotCount = 0,
+        IReadOnlyList<GridShipSnapshot>? ships = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         if (cells.Count != Size * Size)
@@ -90,6 +91,63 @@ public class GridModel : IPrototype<GridModel>
             }
         }
 
+        if (ships is not null)
+        {
+            foreach (var shipSnapshot in ships)
+            {
+                if (shipSnapshot is null || !Enum.IsDefined(shipSnapshot.Type))
+                {
+                    throw new ArgumentException("The snapshot contains an invalid ship.", nameof(ships));
+                }
+
+                var ship = ShipCatalogue.Create(shipSnapshot.Type);
+                if (shipSnapshot.Cells is null ||
+                    shipSnapshot.Cells.Length != ship.Shape.Count ||
+                    shipSnapshot.RemainingCells < 0 ||
+                    shipSnapshot.RemainingCells > ship.Shape.Count)
+                {
+                    throw new ArgumentException("The snapshot contains an invalid ship state.", nameof(ships));
+                }
+
+                int owner = grid._placedShips.Count;
+                int hitCells = 0;
+                var uniqueCells = new HashSet<GridPosition>();
+                foreach (var position in shipSnapshot.Cells)
+                {
+                    if (!IsInsideBounds(position.X, position.Y) ||
+                        !uniqueCells.Add(position) ||
+                        grid._shipOwners[position.X, position.Y] != -1 ||
+                        grid._cells[position.X, position.Y] is not (CellState.Ship or CellState.Fired))
+                    {
+                        throw new ArgumentException("The snapshot contains invalid ship cells.", nameof(ships));
+                    }
+
+                    if (grid._cells[position.X, position.Y] == CellState.Fired)
+                    {
+                        if (grid._shots[position.X, position.Y] != ShotHit)
+                        {
+                            throw new ArgumentException("A damaged ship cell must have a hit marker.", nameof(ships));
+                        }
+
+                        hitCells++;
+                    }
+                    else if (grid._shots[position.X, position.Y] == ShotHit)
+                    {
+                        throw new ArgumentException("A hit marker must correspond to a damaged ship cell.", nameof(ships));
+                    }
+
+                    grid._shipOwners[position.X, position.Y] = owner;
+                }
+
+                if (shipSnapshot.RemainingCells != ship.Shape.Count - hitCells)
+                {
+                    throw new ArgumentException("The snapshot ship damage does not match the board.", nameof(ships));
+                }
+
+                grid._placedShips.Add(new PlacedShip(ship, shipSnapshot.RemainingCells));
+            }
+        }
+
         return grid;
     }
 
@@ -107,6 +165,14 @@ public class GridModel : IPrototype<GridModel>
     {
         ArgumentNullException.ThrowIfNull(obstacles);
         ArgumentNullException.ThrowIfNull(powerUps);
+
+        for (int x = 0; x < Size; x++)
+        {
+            for (int y = 0; y < Size; y++)
+            {
+                _shipOwners[x, y] = -1;
+            }
+        }
 
         foreach (var obstacle in obstacles)
         {
@@ -224,6 +290,142 @@ public class GridModel : IPrototype<GridModel>
         }
 
         _placedShips.AddRange(newShips);
+        return true;
+    }
+
+    public bool TryMoveShip(int fromX, int fromY, int deltaX, int deltaY)
+    {
+        if (!IsInsideBounds(fromX, fromY) ||
+            (deltaX == 0 && deltaY == 0) ||
+            (deltaX != 0 && deltaY != 0))
+        {
+            return false;
+        }
+
+        int owner = _shipOwners[fromX, fromY];
+        if (owner < 0 || _cells[fromX, fromY] != CellState.Ship)
+        {
+            return false;
+        }
+
+        var placedShip = _placedShips[owner];
+        var capability = placedShip.Ship.MovementCapability;
+        if (capability is null || placedShip.RemainingCells != placedShip.Ship.Shape.Count)
+        {
+            return false;
+        }
+
+        long distance = Math.Abs((long)deltaX) + Math.Abs((long)deltaY);
+        if (distance > capability.MaximumDistance)
+        {
+            return false;
+        }
+
+        int moveDistance = (int)distance;
+        int stepX = Math.Sign(deltaX);
+        int stepY = Math.Sign(deltaY);
+        var shipCells = new List<GridPosition>();
+        for (int y = 0; y < Size; y++)
+        {
+            for (int x = 0; x < Size; x++)
+            {
+                if (_shipOwners[x, y] == owner)
+                {
+                    if (_cells[x, y] != CellState.Ship)
+                    {
+                        return false;
+                    }
+
+                    shipCells.Add(new GridPosition(x, y));
+                }
+            }
+        }
+
+        if (shipCells.Count != placedShip.Ship.Shape.Count)
+        {
+            return false;
+        }
+
+        var route = new List<GridPosition>(shipCells);
+        bool crossesObstacle = false;
+        for (int step = 1; step <= moveDistance; step++)
+        {
+            foreach (var cell in shipCells)
+            {
+                int x = cell.X + stepX * step;
+                int y = cell.Y + stepY * step;
+                if (!IsInsideBounds(x, y))
+                {
+                    return false;
+                }
+
+                route.Add(new GridPosition(x, y));
+                int cellOwner = _shipOwners[x, y];
+                var cellState = _cells[x, y];
+                if (cellOwner >= 0 && cellOwner != owner)
+                {
+                    return false;
+                }
+
+                if (cellState == CellState.Obstacle)
+                {
+                    if (!capability.CanPassObstaclesAwayFromEdges || step == moveDistance)
+                    {
+                        return false;
+                    }
+
+                    crossesObstacle = true;
+                }
+                else if (cellState is not (CellState.Empty or CellState.Ship))
+                {
+                    return false;
+                }
+            }
+        }
+
+        if (crossesObstacle && route.Any(cell =>
+                cell.X == 0 || cell.Y == 0 || cell.X == Size - 1 || cell.Y == Size - 1))
+        {
+            return false;
+        }
+
+        var destination = shipCells
+            .Select(cell => new GridPosition(cell.X + deltaX, cell.Y + deltaY))
+            .ToArray();
+        foreach (var cell in destination)
+        {
+            if (_cells[cell.X, cell.Y] is not (CellState.Empty or CellState.Ship) ||
+                (_shipOwners[cell.X, cell.Y] >= 0 && _shipOwners[cell.X, cell.Y] != owner))
+            {
+                return false;
+            }
+
+            for (int neighborY = cell.Y - 1; neighborY <= cell.Y + 1; neighborY++)
+            {
+                for (int neighborX = cell.X - 1; neighborX <= cell.X + 1; neighborX++)
+                {
+                    if (IsInsideBounds(neighborX, neighborY) &&
+                        _shipOwners[neighborX, neighborY] >= 0 &&
+                        _shipOwners[neighborX, neighborY] != owner)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        foreach (var cell in shipCells)
+        {
+            _cells[cell.X, cell.Y] = CellState.Empty;
+            _shipOwners[cell.X, cell.Y] = -1;
+        }
+
+        foreach (var cell in destination)
+        {
+            _cells[cell.X, cell.Y] = CellState.Ship;
+            _shipOwners[cell.X, cell.Y] = owner;
+        }
+
         return true;
     }
 
@@ -360,6 +562,31 @@ public class GridModel : IPrototype<GridModel>
         }
 
         return cells;
+    }
+
+    public GridShipSnapshot[] GetShipSnapshots()
+    {
+        var snapshots = new GridShipSnapshot[_placedShips.Count];
+        for (int owner = 0; owner < _placedShips.Count; owner++)
+        {
+            var cells = new List<GridPosition>();
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (_shipOwners[x, y] == owner)
+                    {
+                        cells.Add(new GridPosition(x, y));
+                    }
+                }
+            }
+
+            var ship = _placedShips[owner];
+            snapshots[owner] = new GridShipSnapshot(
+                ship.Ship.Type, cells.ToArray(), ship.RemainingCells);
+        }
+
+        return snapshots;
     }
 
     public int[] ToShotCodes()

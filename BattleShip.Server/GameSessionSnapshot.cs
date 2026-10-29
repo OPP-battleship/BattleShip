@@ -1,3 +1,5 @@
+using BattleShip.Shared;
+
 namespace BattleShip.Server;
 
 /// <summary>
@@ -9,6 +11,8 @@ public class GameSessionSnapshot
     public string LevelId { get; set; } = "Level1";
     public int[] GridA { get; set; } = [];
     public int[] GridB { get; set; } = [];
+    public GridShipSnapshot[] ShipsA { get; set; } = [];
+    public GridShipSnapshot[] ShipsB { get; set; } = [];
     public int[] ShotsA { get; set; } = [];
     public int[] ShotsB { get; set; } = [];
     public int[] PowerUpsA { get; set; } = [];

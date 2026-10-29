@@ -17,5 +17,7 @@ public interface IGameEventObserver
 
     void OnShotResult(ShotResultMessage message);
 
+    void OnShipMoved(ShipMovedMessage message);
+
     void OnOpponentDisconnected(OpponentDisconnectedMessage message);
 }

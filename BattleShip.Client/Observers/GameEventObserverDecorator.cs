@@ -25,6 +25,9 @@ public abstract class GameEventObserverDecorator(IGameEventObserver inner) : IGa
     public virtual void OnShotResult(ShotResultMessage message) =>
         Inner.OnShotResult(message);
 
+    public virtual void OnShipMoved(ShipMovedMessage message) =>
+        Inner.OnShipMoved(message);
+
     public virtual void OnOpponentDisconnected(OpponentDisconnectedMessage message) =>
         Inner.OnOpponentDisconnected(message);
 }
