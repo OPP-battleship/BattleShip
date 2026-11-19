@@ -1,14 +1,27 @@
+using System.Collections.Concurrent;
+
 namespace BattleShip.Shared;
 
 public static class ShipCatalogue
 {
     public const int PointBudget = 30;
     private static readonly ShipDirector Director = new();
+    private static readonly ConcurrentDictionary<ShipType, Ship> Flyweights = new();
 
     public static IReadOnlyList<ShipType> AllTypes { get; } =
         Array.AsReadOnly(Enum.GetValues<ShipType>());
 
     public static Ship Create(ShipType type)
+    {
+        if (!Enum.IsDefined(type))
+        {
+            throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown ship type.");
+        }
+
+        return Flyweights.GetOrAdd(type, CreateFlyweight);
+    }
+
+    private static Ship CreateFlyweight(ShipType type)
     {
         Func<Ship> createProduct = type switch
         {
