@@ -275,10 +275,12 @@ public class GridModel : IPrototype<GridModel>
             }
 
             var occupiedCells = new List<GridPosition>(offsets.Count);
-            foreach (var offset in offsets)
+            using IPositionIterator positions = new ShipPositionIterator(offsets, new GridPosition(placement.X, placement.Y));
+            while (positions.MoveNext())
             {
-                int x = placement.X + offset.X;
-                int y = placement.Y + offset.Y;
+                var position = positions.Current;
+                int x = position.X;
+                int y = position.Y;
                 if (!IsInsideBounds(x, y) || _cells[x, y] != CellState.Empty || shipOwners[x, y] != -1)
                 {
                     return false;
@@ -461,7 +463,6 @@ public class GridModel : IPrototype<GridModel>
         ArgumentNullException.ThrowIfNull(powerUps);
 
         var powerUpItems = powerUps.ToArray();
-        var additions = new List<GridPosition>();
         var uniquePositions = new HashSet<GridPosition>();
         foreach (var powerUp in powerUpItems)
         {
@@ -474,13 +475,13 @@ public class GridModel : IPrototype<GridModel>
                 {
                     return false;
                 }
-
-                additions.Add(position);
             }
         }
 
-        foreach (var position in additions)
+        using IPositionIterator positions = new PositionSetIterator(uniquePositions);
+        while (positions.MoveNext())
         {
+            var position = positions.Current;
             _cells[position.X, position.Y] = CellState.PowerUp;
         }
 
@@ -580,12 +581,11 @@ public class GridModel : IPrototype<GridModel>
     public CellState[] ToFlatArray()
     {
         var cells = new CellState[Size * Size];
-        for (int y = 0; y < Size; y++)
+        using IPositionIterator positions = new BoardPositionIterator(_cells);
+        while (positions.MoveNext())
         {
-            for (int x = 0; x < Size; x++)
-            {
-                cells[y * Size + x] = _cells[x, y];
-            }
+            var position = positions.Current;
+            cells[position.Y * Size + position.X] = _cells[position.X, position.Y];
         }
 
         return cells;
