@@ -1,4 +1,5 @@
-﻿using BattleShip.Shared;
+﻿using BattleShip.Server.TurnActions;
+using BattleShip.Shared;
 
 namespace BattleShip.Server;
 
@@ -135,116 +136,37 @@ public class GameSession : IPrototype<GameSession>
     public string OpponentOf(string connectionId) =>
         connectionId == PlayerAConnectionId ? PlayerBConnectionId : PlayerAConnectionId;
 
-    private GridModel GridOf(string connectionId) =>
+    internal GridModel GridOf(string connectionId) =>
         connectionId == PlayerAConnectionId ? GridA : GridB;
+
+    /// <summary>Lock shared with <see cref="TurnAction"/> so a whole turn runs atomically.</summary>
+    internal object SyncRoot => _lock;
+
+    /// <summary>Called by the <see cref="TurnAction"/> template method at the end of a turn.</summary>
+    internal void PassTurnTo(string connectionId)
+    {
+        lock (_lock)
+        {
+            CurrentTurnConnectionId = connectionId;
+        }
+    }
 
     internal bool TryFireShotPattern(string shooterConnectionId, FireShotRequest request, out IReadOnlyList<ShotOutcome> outcomes)
     {
         outcomes = [];
-        var results = new List<ShotOutcome>();
+        if (request is null) return false;
 
-        lock (_lock)
-        {
-            if (!_isGameStarted) return false;
-            if (shooterConnectionId != CurrentTurnConnectionId) return false;
-            if (request is null ||
-                !Enum.IsDefined(request.Strategy) ||
-                !Enum.IsDefined(request.LineOrientation) ||
-                !GridModel.IsInsideBounds(request.OriginX, request.OriginY))
-            {
-                return false;
-            }
+        var action = new FireShotAction(request);
+        if (!action.Execute(this, shooterConnectionId)) return false;
 
-            var shooterGrid = GridOf(shooterConnectionId);
-            if (!shooterGrid.GetAvailableShotStrategies().Contains(request.Strategy))
-            {
-                return false;
-            }
-
-            bool shotAreaUpActive = shooterGrid.HasShotAreaUp;
-            bool freeShotActive = shooterGrid.HasFreeShot;
-            IShotStrategy strategy = ShotStrategyFactory.Create(request.Strategy, request.LineOrientation);
-            if (shotAreaUpActive)
-            {
-                strategy = new ShotAreaUpShotStrategyAdapter(strategy);
-            }
-
-            var targets = strategy
-                .GetTargets(request.OriginX, request.OriginY);
-            if (targets.Count == 0) return false;
-
-            var defenderId = OpponentOf(shooterConnectionId);
-            var defenderGrid = GridOf(defenderId);
-
-            var seenTargets = new HashSet<ShotTarget>();
-            foreach (var target in targets)
-            {
-                if (!seenTargets.Add(target))
-                {
-                    continue;
-                }
-
-                if (!GridModel.IsInsideBounds(target.X, target.Y))
-                {
-                    continue;
-                }
-
-                var cellState = defenderGrid.GetCell(target.X, target.Y);
-                bool isHit = cellState == CellState.Ship;
-                bool isObstacle = cellState == CellState.Obstacle;
-                if (!defenderGrid.TryMarkFired(target.X, target.Y, out var powerUp))
-                {
-                    continue;
-                }
-
-                PowerUpType? collectedPowerUp = null;
-                if (powerUp is not null)
-                {
-                    new PowerUpAdapter(powerUp).ApplyTo(shooterGrid);
-                    collectedPowerUp = powerUp.GetPowerUpType();
-                }
-
-                results.Add(new ShotOutcome(target.X, target.Y, isHit, isObstacle, collectedPowerUp));
-            }
-
-            if (results.Count == 0) return false;
-
-            if (shotAreaUpActive)
-            {
-                shooterGrid.TryConsumeShotAreaUp();
-            }
-
-            if (freeShotActive)
-            {
-                shooterGrid.TryConsumeFreeShot();
-            }
-
-            CurrentTurnConnectionId = shooterGrid.TryConsumeExtraTurn()
-                ? shooterConnectionId
-                : defenderId;
-            outcomes = results;
-            return true;
-        }
+        outcomes = action.Outcomes;
+        return true;
     }
 
     internal bool TryMoveShip(string movingConnectionId, MoveShipRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
-        lock (_lock)
-        {
-            if (!_isGameStarted ||
-                movingConnectionId != CurrentTurnConnectionId ||
-                (movingConnectionId != PlayerAConnectionId && movingConnectionId != PlayerBConnectionId) ||
-                !GridOf(movingConnectionId).TryMoveShip(
-                    request.FromX, request.FromY, request.DeltaX, request.DeltaY))
-            {
-                return false;
-            }
-
-            CurrentTurnConnectionId = OpponentOf(movingConnectionId);
-            return true;
-        }
+        GameAction action = new MoveShipAction(request);
+        return action.Execute(this, movingConnectionId);
     }
 
     internal bool TrySubmitShipPlacement(string connectionId, IReadOnlyList<ShipPlacement>? placements, out bool gameStarted)
